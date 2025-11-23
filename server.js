@@ -6,10 +6,10 @@ app.use(express.urlencoded({ extended: true }));
 
 app.get('/', (req, res) => {
   res.send(`
-    <h1>sententia 稼働中</h1>
+    <h1>sententia</h1>
     <form action="/post" method="POST">
       <input name="company" placeholder="企業名" required><br><br>
-      <textarea name="opinion" placeholder="意見" rows="6" required></textarea><br><br>
+      <textarea name="opinion" placeholder="意見を入力" rows="6" required></textarea><br><br>
       <button type="submit">投稿</button>
     </form>
   `);
