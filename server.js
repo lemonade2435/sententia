@@ -4,6 +4,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// 仮の投稿データ（後でDBに変える）
+let posts = [
+  { type: "company", text: "Appleの新製品、期待外れだった", time: "2分前" },
+  { type: "thing", text: "ChatGPTが有料化したけど微妙", time: "15分前" },
+  { type: "company", text: "Teslaの自動運転、信頼できる？", time: "1時間前" }
+];
+
 app.get('/', (req, res) => {
   res.send(`
 <!DOCTYPE html>
@@ -14,47 +21,76 @@ app.get('/', (req, res) => {
   <title>sententia</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-100 min-h-screen">
 
   <!-- 左上タイトル -->
   <div class="fixed top-6 left-6 z-40">
     <h1 class="text-3xl font-bold text-indigo-600">sententia</h1>
   </div>
 
-  <!-- 投稿一覧（今は空でもOK、後で追加） -->
-  <div class="max-w-2xl mx-auto pt-24 pb-32">
-    <!-- ここに後で投稿が並ぶ -->
+  <!-- メインコンテンツ -->
+  <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
+
+    <!-- 検索ボックス -->
+    <div class="relative mb-8">
+      <input type="text" placeholder="キーワードで検索" class="w-full pl-12 pr-6 py-4 text-lg rounded-full border border-gray-300 focus:outline-none focus:border-indigo-500">
+      <svg class="absolute left-4 top-5 w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+    </div>
+
+    <!-- 最近のトピック -->
+    <h2 class="text-2xl font-bold mb-6">最近のトピック</h2>
+    <div class="space-y-4">
+      ${posts.map(p => `
+        <div class="bg-white rounded-2xl p-6 shadow-md">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="px-4 py-1 rounded-full text-sm font-medium ${p.type==='company'?'bg-blue-100 text-blue-700':'bg-purple-100 text-purple-700'}">
+              ${p.type==='company'?'企業':'物事'}
+            </span>
+            <span class="text-gray-500 text-sm">${p.time}</span>
+          </div>
+          <p class="text-lg">${p.text}</p>
+        </div>
+      `).join('')}
+    </div>
   </div>
 
-  <!-- 右下固定ボタン -->
+  <!-- 右下横長ボタン -->
   <button onclick="document.getElementById('modal').classList.remove('hidden')"
-          class="fixed bottom-6 right-6 w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-4xl font-bold z-50 transition-all hover:scale-110">
-    +
+          class="fixed bottom-6 right-6 w-44 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-xl font-bold z-50 transition-all hover:scale-105">
+    投稿する
   </button>
 
-  <!-- モーダル（最初は非表示） -->
+  <!-- モーダル -->
   <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
-      
-      <!-- 閉じるボタン -->
       <button onclick="document.getElementById('modal').classList.add('hidden')"
               class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
 
       <form action="/post" method="POST">
-        <!-- 企業 / 物事 タブ -->
-        <div class="flex gap-3 mb-6">
-          <input type="radio" name="type" value="company" id="company" checked class="hidden peer/company">
-          <label for="company" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-medium cursor-pointer peer-checked/company:bg-blue-600">企業</label>
-          
-          <input type="radio" name="type" value="thing" id="thing" class="hidden peer/thing">
-          <label for="thing" class="bg-gray-100 text-gray-600 px-6 py-3 rounded-xl font-medium cursor-pointer hover:bg-gray-200 peer-checked/thing:bg-blue-600 peer-checked/thing:text-white">物事</label>
+        <!-- ∨選択する ドロップダウン風 -->
+        <div class="mb-8">
+          <button type="button" onclick="this.nextElementSibling.classList.toggle('hidden')"
+                  class="w-full text-left text-xl font-medium flex items-center justify-between bg-gray-100 px-6 py-4 rounded-2xl">
+            <span id="selected-type">企業</span>
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div class="hidden mt-2 bg-white rounded-2xl shadow-lg overflow-hidden">
+            <label class="block px-6 py-4 hover:bg-gray-50 cursor-pointer">
+              <input type="radio" name="type" value="company" checked onchange="document.getElementById('selected-type').textContent='企業'" class="hidden">
+              企業
+            </label>
+            <label class="block px-6 py-4 hover:bg-gray-50 cursor-pointer">
+              <input type="radio" name="type" value="thing" onchange="document.getElementById('selected-type').textContent='物事'" class="hidden">
+              物事
+            </label>
+          </div>
         </div>
 
-        <!-- 意見入力 -->
         <textarea name="opinion" placeholder="意見を入力" required
-                  class="w-full h-48 p-5 text-lg border-2 border-gray-200 rounded-2xl focus:border-blue-500 focus:outline-none resize-none"></textarea>
+                  class="w-full h-48 p-5 text-lg border-2 border-gray-200 rounded-2xl focus:border-blue-500 focus:outline-none resize-none mb-20"></textarea>
 
-        <!-- 送信ボタン -->
         <button type="submit"
                 class="absolute bottom-6 right-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-full shadow-lg transition-all hover:scale-105">
           送信
@@ -69,10 +105,14 @@ app.get('/', (req, res) => {
 });
 
 app.post('/post', (req, res) => {
-  console.log('新投稿 →', req.body);
+  posts.unshift({
+    type: req.body.type || "company",
+    text: req.body.opinion,
+    time: "たった今"
+  });
   res.send(`
     <script>
-      alert('投稿ありがとう！');
+      alert('投稿完了！');
       location.href = '/';
     </script>
   `);
