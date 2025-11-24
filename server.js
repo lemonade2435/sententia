@@ -1,3 +1,4 @@
+const { RedisStore } = require('connect-redis');
 const express = require('express');
 const session = require('express-session');
 const RedisStore = require('connect-redis');
@@ -15,8 +16,13 @@ app.use(express.urlencoded({ extended: true }));
 const redisClient = new Redis(process.env.UPSTASH_REDIS_URL);
 
 // セッション設定（Redisストアで永続化）
+const redisStore = new RedisStore({
+  client: redisClient,
+  prefix: 'sententia:'
+});
+
 app.use(session({
-  store: new RedisStore(session, { client: redisClient }),
+  store: redisStore,
   secret: process.env.SESSION_SECRET || 'sententia-secret-key',
   resave: false,
   saveUninitialized: false,
