@@ -1,11 +1,6 @@
 const express = require('express');
 const session = require('express-session');
-const { default: RedisStore } = require('connect-redis');
-
-const redisStore = new RedisStore({
-  client: redisClient,
-  prefix: 'sententia:'
-});
+const { default: RedisStore } = require('connect-redis'); // v7 の CJS 用読み込み
 const Redis = require('ioredis');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
@@ -30,7 +25,10 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'sententia-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000
+  }
 }));
 
 app.use(passport.initialize());
@@ -79,14 +77,19 @@ passport.use(new GoogleStrategy({
 
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
-  const { data: user } = await supabase.from('users').select('*').eq('id', id).single();
+  const { data: user } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', id)
+    .single();
   done(null, user);
 });
 
 // OAuthルート
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-app.get('/auth/google/callback',
+app.get(
+  '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/login-modal' }),
   (req, res) => res.redirect('/')
 );
@@ -213,7 +216,7 @@ app.get('/', async (req, res) => {
   </button>
 
   <!-- 投稿モーダル -->
-  <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+  <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justifycenter z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
       <button onclick="document.getElementById('modal').classList.add('hidden')"
               class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
@@ -253,11 +256,12 @@ app.get('/', async (req, res) => {
   `);
 });
 
-app.post('/logout', (req, res) => {
+// logout は next を受け取るように
+app.post('/logout', (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
+    res.redirect('/login-modal');
   });
-  res.redirect('/login-modal');
 });
 
 app.post('/post', async (req, res) => {
@@ -266,7 +270,7 @@ app.post('/post', async (req, res) => {
     .from('posts')
     .insert({
       user_id: req.user.id,
-      type: req.body.type || "company",
+      type: req.body.type || 'company',
       text: req.body.opinion
     });
   if (error) return res.send('<script>alert("投稿エラー: ' + error.message + '"); history.back();</script>');
