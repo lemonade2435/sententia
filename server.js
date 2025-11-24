@@ -10,6 +10,27 @@ let posts = []; // ユーザーの投稿を記憶
 
 let currentUser = null; // 現在のユーザー（簡易セッション）
 
+app.get('/login-modal', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Login - sententia</title><script src="https://cdn.tailwindcss.com"></script></head>
+    <body class="bg-gray-100 min-h-screen flex items-center justify-center">
+      <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
+        <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
+        <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
+        <form action="/login" method="POST">
+          <input type="text" name="username" placeholder="ユーザー名" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+          <input type="password" name="password" placeholder="パスワード" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-6 focus:outline-none focus:border-blue-500">
+          <button type="submit" class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600 mb-6">ログイン</button>
+        </form>
+        <p class="text-center text-gray-500">アカウントをお持ちでないですか？ <a href="/signup" class="text-blue-500 hover:text-blue-700 font-medium">Sign up</a></p>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
 app.get('/signup', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -17,13 +38,14 @@ app.get('/signup', (req, res) => {
     <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Sign up - sententia</title><script src="https://cdn.tailwindcss.com"></script></head>
     <body class="bg-gray-100 min-h-screen flex items-center justify-center">
       <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
+        <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
         <h2 class="text-2xl font-bold text-center mb-6">アカウントを作成</h2>
         <form action="/signup" method="POST">
           <input type="text" name="username" placeholder="ユーザー名" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
           <input type="password" name="password" placeholder="パスワード" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-6 focus:outline-none focus:border-blue-500">
           <button type="submit" class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">作成する</button>
         </form>
-        <p class="text-center text-gray-500 mt-4 cursor-pointer hover:text-blue-500" onclick="location.href='/'">すでにアカウントをお持ちですか？ Log in</p>
+        <p class="text-center text-gray-500 mt-4 cursor-pointer hover:text-blue-500" onclick="location.href='/login-modal'">すでにアカウントをお持ちですか？ Log in</p>
       </div>
     </body>
     </html>
@@ -59,10 +81,10 @@ app.get('/', (req, res) => {
     <h1 class="text-3xl font-bold text-indigo-600">sententia</h1>
   </div>
 
-  <!-- 右上 Log in ボタン（ログイン済みならログアウト） -->
-  <button onclick="${currentUser ? 'currentUser=null; location.reload();' : 'document.getElementById(\'login-modal\').classList.remove(\'hidden\')'}" 
+  <!-- 右上 Log out ボタン -->
+  <button onclick="currentUser=null; location.reload();" 
           class="fixed top-6 right-6 bg-black text-white px-6 py-2 rounded-lg font-medium z-40 hover:bg-gray-800">
-    ${currentUser ? 'Log out' : 'Log in'}
+    Log out
   </button>
 
   <!-- メインコンテンツ -->
@@ -138,22 +160,6 @@ app.get('/', (req, res) => {
     </div>
   </div>
 
-  <!-- ログイン・サインアップモーダル -->
-  <div id="login-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
-      <button onclick="document.getElementById('login-modal').classList.add('hidden')"
-              class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
-
-      <form action="/login" method="POST">
-        <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
-        <input type="text" name="username" placeholder="ユーザー名" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
-        <input type="password" name="password" placeholder="パスワード" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-6 focus:outline-none focus:border-blue-500">
-        <button type="submit" class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600 mb-6">ログイン</button>
-      </form>
-      <p class="text-center text-gray-500">アカウントをお持ちでないですか？ <a href="/signup" class="text-blue-500 hover:text-blue-700 font-medium">Sign up</a></p>
-    </div>
-  </div>
-
 </body>
 </html>
   `);
@@ -165,7 +171,7 @@ app.post('/login', (req, res) => {
     currentUser = username;
     res.redirect('/');
   } else {
-    res.send('<script>alert("ユーザー名かパスワードが間違っています"); document.getElementById("login-modal").classList.remove("hidden");</script>');
+    res.send('<script>alert("ユーザー名かパスワードが間違っています"); location.href="/login-modal";</script>');
   }
 });
 
