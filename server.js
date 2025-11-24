@@ -1,6 +1,11 @@
 const express = require('express');
 const session = require('express-session');
-const RedisStore = require('connect-redis')(session);
+const { default: RedisStore } = require('connect-redis');
+
+const redisStore = new RedisStore({
+  client: redisClient,
+  prefix: 'sententia:'
+});
 const Redis = require('ioredis');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
