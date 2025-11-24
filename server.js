@@ -4,13 +4,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 簡易ユーザー管理（後でDBに変える）
-const users = {}; // { username: password }
+// IPごとのユーザー管理（Map: IP → {user, password}）
+const sessions = new Map(); // IPをキー、ログイン状態を値に
+
 let posts = []; // ユーザーの投稿を記憶
 
-let currentUser = null; // 現在のユーザー（簡易セッション）
-
 app.get('/login-modal', (req, res) => {
+  const ip = req.ip;
   res.send(`
     <!DOCTYPE html>
     <html lang="ja">
@@ -32,6 +32,7 @@ app.get('/login-modal', (req, res) => {
 });
 
 app.get('/signup', (req, res) => {
+  const ip = req.ip;
   res.send(`
     <!DOCTYPE html>
     <html lang="ja">
@@ -53,18 +54,21 @@ app.get('/signup', (req, res) => {
 });
 
 app.post('/signup', (req, res) => {
+  const ip = req.ip;
   const { username, password } = req.body;
-  if (users[username]) {
+  if (sessions.get(ip)?.user === username) {
     res.send('<script>alert("ユーザー名が既に存在します"); history.back();</script>');
   } else {
-    users[username] = password;
-    currentUser = username;
+    sessions.set(ip, { user: username, password });
     res.redirect('/');
   }
 });
 
 app.get('/', (req, res) => {
-  if (!currentUser) return res.redirect('/login-modal');
+  const ip = req.ip;
+  const session = sessions.get(ip);
+  if (!session) return res.redirect('/login-modal');
+
   res.send(`
 <!DOCTYPE html>
 <html lang="ja">
@@ -82,10 +86,11 @@ app.get('/', (req, res) => {
   </div>
 
   <!-- 右上 Log out ボタン -->
-  <button onclick="currentUser=null; location.reload();" 
-          class="fixed top-6 right-6 bg-black text-white px-6 py-2 rounded-lg font-medium z-40 hover:bg-gray-800">
-    Log out
-  </button>
+  <form action="/logout" method="POST" style="display: inline;">
+    <button type="submit" class="fixed top-6 right-6 bg-black text-white px-6 py-2 rounded-lg font-medium z-40 hover:bg-gray-800">
+      Log out
+    </button>
+  </form>
 
   <!-- メインコンテンツ -->
   <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
@@ -118,9 +123,9 @@ app.get('/', (req, res) => {
     </div>
   </div>
 
-  <!-- 投稿ボタン -->
+  <!-- 投稿ボタン（z-index強化） -->
   <button onclick="document.getElementById('modal').classList.remove('hidden')"
-          class="fixed bottom-6 right-6 w-44 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-xl font-bold z-50 transition-all hover:scale-105">
+          class="fixed bottom-6 right-6 w-44 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-xl font-bold z-[100] transition-all hover:scale-105">
     投稿する
   </button>
 
@@ -166,19 +171,27 @@ app.get('/', (req, res) => {
 });
 
 app.post('/login', (req, res) => {
+  const ip = req.ip;
   const { username, password } = req.body;
-  if (users[username] && users[username] === password) {
-    currentUser = username;
+  if (sessions.get(ip)?.user === username && sessions.get(ip)?.password === password) {
     res.redirect('/');
   } else {
     res.send('<script>alert("ユーザー名かパスワードが間違っています"); location.href="/login-modal";</script>');
   }
 });
 
+app.post('/logout', (req, res) => {
+  const ip = req.ip;
+  sessions.delete(ip);
+  res.redirect('/login-modal');
+});
+
 app.post('/post', (req, res) => {
-  if (!currentUser) return res.redirect('/login-modal');
+  const ip = req.ip;
+  const session = sessions.get(ip);
+  if (!session) return res.redirect('/login-modal');
   posts.unshift({
-    user: currentUser,
+    user: session.user,
     type: req.body.type || "company",
     text: req.body.opinion,
     time: "たった今"
