@@ -7,6 +7,12 @@ const bcrypt = require('bcrypt');
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'sententia-secret-key', // RenderのEnvironment VariablesにSESSION_SECRET追加推奨
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: process.env.NODE_ENV === 'production' } // 本番でHTTPS時true
+}));
 app.use(passport.initialize());
 app.use(passport.session());
 
