@@ -1,4 +1,6 @@
 const express = require('express');
+const RedisStore = require('connect-redis')(session);
+const Redis = require('ioredis');
 const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
@@ -8,11 +10,14 @@ const bcrypt = require('bcrypt');
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+const redisClient = new Redis(process.env.UPSTASH_REDIS_URL);
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'sententia-secret-key', // RenderのEnvironment VariablesにSESSION_SECRET追加推奨
+  store: new RedisStore({ client: redisClient }),
+  secret: process.env.SESSION_SECRET || 'sententia-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production' } // 本番でHTTPS時true
+  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 } // 24時間有効
 }));
 app.use(passport.initialize());
 app.use(passport.session());
