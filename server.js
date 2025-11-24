@@ -4,14 +4,45 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 仮の投稿データ（後でDBに変える）
-let posts = [
-  { type: "company", text: "Appleの新製品、期待外れだった", time: "2分前" },
-  { type: "thing", text: "ChatGPTが有料化したけど微妙", time: "15分前" },
-  { type: "company", text: "Teslaの自動運転、信頼できる？", time: "1時間前" }
-];
+// 簡易ユーザー管理（後でDBに変える）
+const users = {}; // { username: password }
+let posts = []; // ユーザーの投稿を記憶
+
+let currentUser = null; // 現在のユーザー（簡易セッション）
+
+app.get('/signup', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Sign up - sententia</title><script src="https://cdn.tailwindcss.com"></script></head>
+    <body class="bg-gray-100 min-h-screen flex items-center justify-center">
+      <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
+        <h2 class="text-2xl font-bold text-center mb-6">アカウントを作成</h2>
+        <form action="/signup" method="POST">
+          <input type="text" name="username" placeholder="ユーザー名" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+          <input type="password" name="password" placeholder="パスワード" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-6 focus:outline-none focus:border-blue-500">
+          <button type="submit" class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">作成する</button>
+        </form>
+        <p class="text-center text-gray-500 mt-4 cursor-pointer hover:text-blue-500" onclick="location.href='/'">すでにアカウントをお持ちですか？ Log in</p>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+app.post('/signup', (req, res) => {
+  const { username, password } = req.body;
+  if (users[username]) {
+    res.send('<script>alert("ユーザー名が既に存在します"); history.back();</script>');
+  } else {
+    users[username] = password;
+    currentUser = username;
+    res.redirect('/');
+  }
+});
 
 app.get('/', (req, res) => {
+  if (!currentUser) return res.redirect('/login-modal');
   res.send(`
 <!DOCTYPE html>
 <html lang="ja">
@@ -27,6 +58,12 @@ app.get('/', (req, res) => {
   <div class="fixed top-6 left-6 z-40">
     <h1 class="text-3xl font-bold text-indigo-600">sententia</h1>
   </div>
+
+  <!-- 右上 Log in ボタン（ログイン済みならログアウト） -->
+  <button onclick="${currentUser ? 'currentUser=null; location.reload();' : 'document.getElementById(\'login-modal\').classList.remove(\'hidden\')'}" 
+          class="fixed top-6 right-6 bg-black text-white px-6 py-2 rounded-lg font-medium z-40 hover:bg-gray-800">
+    ${currentUser ? 'Log out' : 'Log in'}
+  </button>
 
   <!-- メインコンテンツ -->
   <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
@@ -50,26 +87,28 @@ app.get('/', (req, res) => {
             </span>
             <span class="text-gray-500 text-sm">${p.time}</span>
           </div>
-          <p class="text-lg">${p.text}</p>
+          <div class="flex items-start gap-3">
+            <span class="text-sm font-medium text-gray-700 mt-1">${p.user}</span>
+            <p class="text-lg flex-1">${p.text}</p>
+          </div>
         </div>
       `).join('')}
     </div>
   </div>
 
-  <!-- 右下横長ボタン -->
+  <!-- 投稿ボタン -->
   <button onclick="document.getElementById('modal').classList.remove('hidden')"
           class="fixed bottom-6 right-6 w-44 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-xl font-bold z-50 transition-all hover:scale-105">
     投稿する
   </button>
 
-  <!-- モーダル -->
+  <!-- 投稿モーダル -->
   <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
       <button onclick="document.getElementById('modal').classList.add('hidden')"
               class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
 
       <form action="/post" method="POST">
-        <!-- ∨選択する ドロップダウン風 -->
         <div class="mb-8">
           <button type="button" onclick="this.nextElementSibling.classList.toggle('hidden')"
                   class="w-full text-left text-xl font-medium flex items-center justify-between bg-gray-100 px-6 py-4 rounded-2xl">
@@ -99,13 +138,41 @@ app.get('/', (req, res) => {
     </div>
   </div>
 
+  <!-- ログイン・サインアップモーダル -->
+  <div id="login-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
+      <button onclick="document.getElementById('login-modal').classList.add('hidden')"
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
+
+      <form action="/login" method="POST">
+        <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
+        <input type="text" name="username" placeholder="ユーザー名" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+        <input type="password" name="password" placeholder="パスワード" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-6 focus:outline-none focus:border-blue-500">
+        <button type="submit" class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600 mb-6">ログイン</button>
+      </form>
+      <p class="text-center text-gray-500">アカウントをお持ちでないですか？ <a href="/signup" class="text-blue-500 hover:text-blue-700 font-medium">Sign up</a></p>
+    </div>
+  </div>
+
 </body>
 </html>
   `);
 });
 
+app.post('/login', (req, res) => {
+  const { username, password } = req.body;
+  if (users[username] && users[username] === password) {
+    currentUser = username;
+    res.redirect('/');
+  } else {
+    res.send('<script>alert("ユーザー名かパスワードが間違っています"); document.getElementById("login-modal").classList.remove("hidden");</script>');
+  }
+});
+
 app.post('/post', (req, res) => {
+  if (!currentUser) return res.redirect('/login-modal');
   posts.unshift({
+    user: currentUser,
     type: req.body.type || "company",
     text: req.body.opinion,
     time: "たった今"
