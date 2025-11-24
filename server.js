@@ -1,4 +1,3 @@
-const { RedisStore } = require('connect-redis');
 const express = require('express');
 const session = require('express-session');
 const RedisStore = require('connect-redis');
