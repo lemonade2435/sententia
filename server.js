@@ -1,7 +1,7 @@
 const express = require('express');
+const session = require('express-session');
 const RedisStore = require('connect-redis')(session);
 const Redis = require('ioredis');
-const session = require('express-session');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { createClient } = require('@supabase/supabase-js');
@@ -10,15 +10,19 @@ const bcrypt = require('bcrypt');
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Redisクライアント
 const redisClient = new Redis(process.env.UPSTASH_REDIS_URL);
 
+// セッション設定（Redisストアで永続化）
 app.use(session({
   store: new RedisStore({ client: redisClient }),
   secret: process.env.SESSION_SECRET || 'sententia-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 } // 24時間有効
+  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 } // 24時間
 }));
+
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -67,9 +71,9 @@ passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
   const { data: user } = await supabase.from('users').select('*').eq('id', id).single();
   done(null, user);
-});
+}));
 
-// ルート
+// OAuthルート
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
 app.get('/auth/google/callback',
@@ -77,6 +81,7 @@ app.get('/auth/google/callback',
   (req, res) => res.redirect('/')
 );
 
+// ログイン/サインアップモーダル
 app.get('/login-modal', (req, res) => {
   if (req.user) return res.redirect('/');
   res.send(`
