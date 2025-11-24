@@ -71,7 +71,7 @@ passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
   const { data: user } = await supabase.from('users').select('*').eq('id', id).single();
   done(null, user);
-}));
+});
 
 // OAuthルート
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
