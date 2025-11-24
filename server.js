@@ -16,11 +16,11 @@ const redisClient = new Redis(process.env.UPSTASH_REDIS_URL);
 
 // セッション設定（Redisストアで永続化）
 app.use(session({
-  store: new RedisStore({ client: redisClient }),
+  store: new RedisStore(session, { client: redisClient }),
   secret: process.env.SESSION_SECRET || 'sententia-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 } // 24時間
+  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
 }));
 
 app.use(passport.initialize());
