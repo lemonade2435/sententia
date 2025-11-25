@@ -11,6 +11,9 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// 必要に応じてプロキシを信頼（Render などのリバースプロキシ環境用）
+app.set('trust proxy', 1);
+
 // Redisクライアント
 const redisClient = new Redis(process.env.UPSTASH_REDIS_URL);
 
@@ -27,8 +30,10 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      // デプロイ先が HTTPS なら production で true にしてOK
-      secure: process.env.NODE_ENV === 'production',
+      // デバッグ優先のため一旦 false に固定（HTTPS 本番では true 推奨）
+      secure: false,
+      httpOnly: true,
+      sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000
     }
   })
@@ -52,7 +57,6 @@ passport.use(
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-        // 既存ユーザー確認
         let { data: user } = await supabase
           .from('users')
           .select('*')
@@ -60,7 +64,6 @@ passport.use(
           .single();
 
         if (!user) {
-          // 新規ユーザー作成
           const { data, error } = await supabase
             .from('users')
             .insert({
@@ -88,12 +91,18 @@ passport.use(
 // passport セッション用
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
-  const { data: user } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', id)
-    .single();
-  done(null, user);
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) return done(error);
+    return done(null, user);
+  } catch (e) {
+    return done(e);
+  }
 });
 
 // OAuthルート
@@ -160,7 +169,7 @@ app.get('/login-modal', (req, res) => {
 
         <p class="text-center text-gray-500 mb-3">または</p>
 
-        <!-- Google ログインボタン（テキストボックスの下） -->
+        <!-- Google ログインボタン -->
         <a href="/auth/google"
            class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600">
           Googleでログイン
@@ -179,7 +188,7 @@ app.get('/login-modal', (req, res) => {
   `);
 });
 
-// サインアップページ（ここにも Google ボタン追加）
+// サインアップページ
 app.get('/signup', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -238,7 +247,6 @@ app.post('/signup', async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // パスワードをハッシュ化して保存
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const { data, error } = await supabase
@@ -250,7 +258,6 @@ app.post('/signup', async (req, res) => {
     if (error) {
       console.error('Supabase signup error:', error);
 
-      // ユーザー名ユニーク制約に引っかかった場合
       if (error.code === '23505') {
         return res.send(`
           <script>
@@ -268,7 +275,6 @@ app.post('/signup', async (req, res) => {
       `);
     }
 
-    // 正常に作成できたらログイン画面へ
     return res.redirect('/login-modal');
   } catch (e) {
     console.error('POST /signup error:', e);
@@ -286,7 +292,6 @@ app.post('/login', async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
-    // ユーザー取得
     const { data: user, error } = await supabase
       .from('users')
       .select('id, username, password')
@@ -313,6 +318,8 @@ app.post('/login', async (req, res, next) => {
           '<script>alert("ログイン中にエラーが発生しました"); history.back();</script>'
         );
       }
+      // ここでセッションが作られ、次のリクエストから req.user が使える
+      console.log('LOGIN SUCCESS:', user.id, user.username);
       return res.redirect('/');
     });
   } catch (e) {
@@ -325,13 +332,19 @@ app.post('/login', async (req, res, next) => {
 
 // ホーム（未ログインでも閲覧可）
 app.get('/', async (req, res) => {
-  const { data: postsData } = await supabase
+  const { data: postsData, error } = await supabase
     .from('posts')
     .select('*, users(username)')
     .order('time', { ascending: false });
 
+  if (error) {
+    console.error('Supabase posts error:', error);
+  }
+
   const posts = postsData || [];
   const isLoggedIn = !!req.user;
+
+  console.log('HOME req.user:', req.user && { id: req.user.id, username: req.user.username });
 
   res.send(`
 <!DOCTYPE html>
