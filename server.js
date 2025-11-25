@@ -107,10 +107,9 @@ app.get(
 );
 
 // ログイン画面（フォーム + Googleボタン / 背景暗く / ×でホームへ）
-app.get('/login-modal', async (req, res) => {
+app.get('/login-modal', (req, res) => {
   if (req.user) return res.redirect('/');
 
-  // ホームっぽさを出すため、タイトルだけ同じにしておく
   res.send(`
     <!DOCTYPE html>
     <html lang="ja">
@@ -178,7 +177,7 @@ app.get('/login-modal', async (req, res) => {
   `);
 });
 
-// サインアップページ
+// サインアップページ（ここにも Google ボタン追加）
 app.get('/signup', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -193,12 +192,39 @@ app.get('/signup', (req, res) => {
       <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
         <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
         <h2 class="text-2xl font-bold text-center mb-6">アカウントを作成</h2>
-        <form action="/signup" method="POST">
-          <input type="text" name="username" placeholder="ユーザー名" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
-          <input type="password" name="password" placeholder="パスワード" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-6 focus:outline-none focus:border-blue-500">
-          <button type="submit" class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">作成する</button>
+
+        <!-- ローカルサインアップフォーム -->
+        <form action="/signup" method="POST" class="mb-4">
+          <input
+            type="text"
+            name="username"
+            placeholder="ユーザー名"
+            required
+            class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+          <input
+            type="password"
+            name="password"
+            placeholder="パスワード"
+            required
+            class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+          <button
+            type="submit"
+            class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
+            作成する
+          </button>
         </form>
-        <p class="text-center text-gray-500 mt-4 cursor-pointer hover:text-blue-500" onclick="location.href='/login-modal'">すでにアカウントをお持ちですか？ Log in</p>
+
+        <p class="text-center text-gray-500 mb-3">または</p>
+
+        <!-- Google ログイン/登録ボタン -->
+        <a href="/auth/google"
+           class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600">
+          Googleでログイン / 登録
+        </a>
+
+        <p class="text-center text-gray-500 mt-4 cursor-pointer hover:text-blue-500" onclick="location.href='/login-modal'">
+          すでにアカウントをお持ちですか？ Log in
+        </p>
       </div>
     </body>
     </html>
@@ -221,7 +247,7 @@ app.post('/signup', async (req, res) => {
   req.login(data, () => res.redirect('/'));
 });
 
-// ローカルログイン
+// ローカルログイン（sign in）
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
@@ -255,8 +281,6 @@ app.post('/login', async (req, res) => {
 });
 
 // ホーム（未ログインでも閲覧可）
-// ・右上ボタン: 未ログインなら Log in（/login-modalへ）、ログイン時は Log out
-// ・投稿ボタン: 未ログインなら /login-modal へリダイレクト
 app.get('/', async (req, res) => {
   const { data: postsData } = await supabase
     .from('posts')
@@ -363,7 +387,7 @@ app.get('/', async (req, res) => {
       <form action="/post" method="POST">
         <div class="mb-8">
           <button type="button" onclick="this.nextElementSibling.classList.toggle('hidden')"
-                  class="w-full text-left text-xl font-medium flex items-center justify-between bg-gray-100 px-6 py-4 rounded-2xl">
+                  class="w-full text-left text-xl font-medium flex itemscenter justify-between bg-gray-100 px-6 py-4 rounded-2xl">
             <span id="selected-type">企業</span>
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
           </button>
