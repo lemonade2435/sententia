@@ -231,25 +231,33 @@ app.get('/signup', (req, res) => {
   `);
 });
 
-// ローカルサインアップ
+// ローカルサインアップ（ユーザー作成 → ログイン画面へ）
 app.post('/signup', async (req, res) => {
   try {
     const { username, password } = req.body;
+
+    // パスワードをハッシュ化して保存
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const { data, error } = await supabase
       .from('users')
       .insert({ username, password: hashedPassword })
       .select()
       .single();
-    if (error)
+
+    if (error) {
+      console.error('Supabase signup error:', error);
       return res.send(
         '<script>alert("エラー: ' + error.message + '"); history.back();</script>'
       );
-    req.login(data, () => res.redirect('/'));
+    }
+
+    // ここではまだログインさせず、ログイン画面へ誘導
+    return res.redirect('/login-modal');
   } catch (e) {
     console.error('POST /signup error:', e);
     return res.send(
-      '<script>alert("サインアップ中にエラーが発生しました"); history.back();</script>'
+      '<script>alert("サインアップ中にサーバーエラーが発生しました"); history.back();</script>'
     );
   }
 });
