@@ -1,6 +1,6 @@
 const express = require('express');
 const session = require('express-session');
-const RedisStore = require('connect-redis');
+const { default: RedisStore } = require('connect-redis'); // connect-redis v7 用
 const Redis = require('ioredis');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
@@ -14,19 +14,24 @@ app.use(express.urlencoded({ extended: true }));
 // Redisクライアント
 const redisClient = new Redis(process.env.UPSTASH_REDIS_URL);
 
-// セッション設定
+// セッション設定（Redisストアで永続化）
 const redisStore = new RedisStore({
   client: redisClient,
   prefix: 'sententia:'
 });
 
-app.use(session({
-  store: redisStore,
-  secret: process.env.SESSION_SECRET || 'sententia-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
-}));
+app.use(
+  session({
+    store: redisStore,
+    secret: process.env.SESSION_SECRET || 'sententia-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000
+    }
+  })
+);
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -37,86 +42,120 @@ const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Google OAuth設定
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: '/auth/google/callback'
-}, async (accessToken, refreshToken, profile, done) => {
-  try {
-    let { data: user } = await supabase
-      .from('users')
-      .select('*')
-      .eq('google_id', profile.id)
-      .single();
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: '/auth/google/callback'
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        // 既存ユーザー確認
+        let { data: user } = await supabase
+          .from('users')
+          .select('*')
+          .eq('google_id', profile.id)
+          .single();
 
-    if (!user) {
-      const { data, error } = await supabase
-        .from('users')
-        .insert({
-          google_id: profile.id,
-          username: profile.displayName || profile.emails[0].value.split('@')[0],
-          email: profile.emails[0].value
-        })
-        .select()
-        .single();
+        if (!user) {
+          // 新規ユーザー作成
+          const { data, error } = await supabase
+            .from('users')
+            .insert({
+              google_id: profile.id,
+              username:
+                profile.displayName ||
+                profile.emails[0].value.split('@')[0],
+              email: profile.emails[0].value
+            })
+            .select()
+            .single();
 
-      if (error) return done(error);
-      user = data;
+          if (error) return done(error);
+          user = data;
+        }
+
+        return done(null, user);
+      } catch (error) {
+        return done(error);
+      }
     }
-
-    return done(null, user);
-  } catch (error) {
-    return done(error);
-  }
-}));
+  )
+);
 
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
-  const { data: user } = await supabase.from('users').select('*').eq('id', id).single();
+  const { data: user } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', id)
+    .single();
   done(null, user);
 });
 
 // OAuthルート
-app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+app.get(
+  '/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
 
-app.get('/auth/google/callback',
+app.get(
+  '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/login-modal' }),
   (req, res) => res.redirect('/')
 );
 
-// ログイン/サインアップモーダル
+// ログイン/サインアップモーダル（背景オーバーレイ＋×でホームへ）
 app.get('/login-modal', (req, res) => {
   if (req.user) return res.redirect('/');
   res.send(`
     <!DOCTYPE html>
     <html lang="ja">
-    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Login - sententia</title><script src="https://cdn.tailwindcss.com"></script></head>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Login - sententia</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+    </head>
     <body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
-      <div class="absolute inset-0 bg-black bg-opacity-50 z-0"></div> <!-- ホーム風背景を暗く -->
+      <!-- 暗くするオーバーレイ -->
+      <div class="absolute inset-0 bg-black bg-opacity-50 z-0"></div>
+
+      <!-- ログインカード本体 -->
       <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative z-10">
-        <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button> <!-- バツでホームに戻る -->
+        <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
         <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
-        <form action="/login" method="POST">
-          <input type="text" name="username" placeholder="ユーザー名" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
-          <input type="password" name="password" placeholder="パスワード" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-6 focus:outline-none focus:border-blue-500">
-          <button type="submit" class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600 mb-4">ログイン</button>
-        </form>
-        <a href="/auth/google" class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600">Googleでログイン</a> <!-- テキストボックス下にGoogleボタン -->
-        <p class="text-center text-gray-500 mt-4">アカウントをお持ちでないですか？ <a href="/signup" class="text-blue-500 hover:text-blue-700 font-medium">Sign up</a></p>
+
+        <a href="/auth/google"
+           class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600 mt-4">
+          Googleでログイン
+        </a>
+
+        <p class="text-center text-gray-500 mt-4">または</p>
+        <a href="/signup"
+           class="w-full block text-center text-blue-500 hover:text-blue-700 mt-4">
+          Sign up
+        </a>
       </div>
     </body>
     </html>
   `);
 });
 
+// サインアップページ
 app.get('/signup', (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html lang="ja">
-    <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Sign up - sententia</title><script src="https://cdn.tailwindcss.com"></script></head>
-    <body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
-      <div class="absolute inset-0 bg-black bg-opacity-50 z-0"></div>
-      <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative z-10">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Sign up - sententia</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-gray-100 min-h-screen flex items-center justify-center">
+      <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
         <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
         <h2 class="text-2xl font-bold text-center mb-6">アカウントを作成</h2>
         <form action="/signup" method="POST">
@@ -131,6 +170,7 @@ app.get('/signup', (req, res) => {
   `);
 });
 
+// ローカルサインアップ
 app.post('/signup', async (req, res) => {
   const { username, password } = req.body;
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -139,34 +179,21 @@ app.post('/signup', async (req, res) => {
     .insert({ username, password: hashedPassword })
     .select()
     .single();
-  if (error) return res.send('<script>alert("エラー: ' + error.message + '"); history.back();</script>');
+  if (error)
+    return res.send(
+      '<script>alert("エラー: ' + error.message + '"); history.back();</script>'
+    );
   req.login(data, () => res.redirect('/'));
 });
 
-app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const { data: user } = await supabase
-    .from('users')
-    .select('*')
-    .eq('username', username)
-    .single();
-
-  if (user && await bcrypt.compare(password, user.password)) {
-    req.login(user, () => res.redirect('/'));
-  } else {
-    res.send('<script>alert("ユーザー名かパスワードが間違っています"); location.href="/login-modal";</script>');
-  }
-});
-
+// ホーム（未ログインでも表示。投稿やモーダルはログイン必須）
 app.get('/', async (req, res) => {
-  if (!req.user) return res.redirect('/login-modal');
   const { data: postsData } = await supabase
     .from('posts')
     .select('*, users(username)')
     .order('time', { ascending: false });
   const posts = postsData || [];
-
-  const isLoggedIn = !!req.user; // ログイン状態チェック
+  const isLoggedIn = !!req.user;
 
   res.send(`
 <!DOCTYPE html>
@@ -184,8 +211,14 @@ app.get('/', async (req, res) => {
     <h1 class="text-3xl font-bold text-indigo-600">sententia</h1>
   </div>
 
-  <!-- 右上ボタン (動的: Log in / Log out) -->
-  <button onclick="${isLoggedIn ? 'location.href=\'/logout\';' : 'location.href=\'/login-modal\';'}" class="fixed top-6 right-6 bg-black text-white px-6 py-2 rounded-lg font-medium z-40 hover:bg-gray-800">
+  <!-- 右上 Log in / Log out ボタン（動的） -->
+  <form id="logout-form" action="/logout" method="POST" style="display:none;"></form>
+  <button
+    onclick="${isLoggedIn
+      ? "document.getElementById('logout-form').submit();"
+      : "location.href='/login-modal';"
+    }"
+    class="fixed top-6 right-6 bg-black text-white px-6 py-2 rounded-lg font-medium z-40 hover:bg-gray-800">
     ${isLoggedIn ? 'Log out' : 'Log in'}
   </button>
 
@@ -203,29 +236,53 @@ app.get('/', async (req, res) => {
     <!-- 最近のトピック -->
     <h2 class="text-2xl font-bold mb-6">最近のトピック</h2>
     <div class="space-y-4">
-      ${posts.map(p => `
+      ${posts
+        .map(
+          (p) => `
         <div class="bg-white rounded-2xl p-6 shadow-md">
           <div class="flex items-center gap-3 mb-2">
-            <span class="px-4 py-1 rounded-full text-sm font-medium ${p.type==='company'?'bg-blue-100 text-blue-700':'bg-purple-100 text-purple-700'}">
-              ${p.type==='company'?'企業':'物事'}
+            <span class="px-4 py-1 rounded-full text-sm font-medium ${
+              p.type === 'company'
+                ? 'bg-blue-100 text-blue-700'
+                : 'bg-purple-100 text-purple-700'
+            }">
+              ${p.type === 'company' ? '企業' : '物事'}
             </span>
-            <span class="text-gray-500 text-sm">${new Date(p.time).toLocaleString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</span>
+            <span class="text-gray-500 text-sm">
+              ${
+                p.time
+                  ? new Date(p.time).toLocaleString('ja-JP', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })
+                  : ''
+              }
+            </span>
           </div>
           <div class="flex items-start gap-3">
-            <span class="text-sm font-medium text-gray-700 mt-1">${p.users.username}</span>
+            <span class="text-sm font-medium text-gray-700 mt-1">${
+              p.users?.username || '匿名'
+            }</span>
             <p class="text-lg flex-1">${p.text}</p>
           </div>
         </div>
-      `).join('')}
+      `
+        )
+        .join('')}
     </div>
   </div>
 
-  <!-- 投稿ボタン (未ログインなら/login-modalへ) -->
-  <button onclick="${isLoggedIn ? 'document.getElementById(\'modal\').classList.remove(\'hidden\');' : 'location.href=\'/login-modal\';'}" class="fixed bottom-6 right-6 w-44 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-xl font-bold z-[100] transition-all hover:scale-105">
+  <!-- 投稿ボタン（ログインチェック付き） -->
+  <button
+    onclick="${isLoggedIn
+      ? "document.getElementById('modal').classList.remove('hidden');"
+      : "location.href='/login-modal';"
+    }"
+    class="fixed bottom-6 right-6 w-44 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-xl font-bold z-[100] transition-all hover:scale-105">
     投稿する
   </button>
 
-  <!-- 投稿モーダル (ログイン済み時のみ) -->
+  <!-- 投稿モーダル -->
   <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
       <button onclick="document.getElementById('modal').classList.add('hidden')"
@@ -266,23 +323,28 @@ app.get('/', async (req, res) => {
   `);
 });
 
-app.post('/logout', (req, res) => {
+// ログアウト
+app.post('/logout', (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
+    res.redirect('/login-modal');
   });
-  res.redirect('/login-modal');
 });
 
+// 投稿エンドポイント（ログイン必須）
 app.post('/post', async (req, res) => {
   if (!req.user) return res.redirect('/login-modal');
-  const { data, error } = await supabase
-    .from('posts')
-    .insert({
-      user_id: req.user.id,
-      type: req.body.type || "company",
-      text: req.body.opinion
-    });
-  if (error) return res.send('<script>alert("投稿エラー: ' + error.message + '"); history.back();</script>');
+  const { data, error } = await supabase.from('posts').insert({
+    user_id: req.user.id,
+    type: req.body.type || 'company',
+    text: req.body.opinion
+  });
+  if (error)
+    return res.send(
+      '<script>alert("投稿エラー: ' +
+        error.message +
+        '"); history.back();</script>'
+    );
   res.send(`
     <script>
       alert('投稿完了！');
