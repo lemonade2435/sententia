@@ -106,9 +106,11 @@ app.get(
   (req, res) => res.redirect('/')
 );
 
-// ログイン/サインアップモーダル（背景オーバーレイ＋×でホームへ）
-app.get('/login-modal', (req, res) => {
+// ログイン画面（フォーム + Googleボタン / 背景暗く / ×でホームへ）
+app.get('/login-modal', async (req, res) => {
   if (req.user) return res.redirect('/');
+
+  // ホームっぽさを出すため、タイトルだけ同じにしておく
   res.send(`
     <!DOCTYPE html>
     <html lang="ja">
@@ -119,22 +121,55 @@ app.get('/login-modal', (req, res) => {
       <script src="https://cdn.tailwindcss.com"></script>
     </head>
     <body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
-      <!-- 暗くするオーバーレイ -->
-      <div class="absolute inset-0 bg-black bg-opacity-50 z-0"></div>
+      <!-- 背景（ホームの上に半透明オーバーレイが乗っているイメージ） -->
+      <div class="absolute inset-0 z-0">
+        <div class="fixed top-6 left-6">
+          <h1 class="text-3xl font-bold text-indigo-600">sententia</h1>
+        </div>
+        <div class="absolute inset-0 bg-black bg-opacity-50"></div>
+      </div>
 
       <!-- ログインカード本体 -->
       <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative z-10">
         <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
         <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
 
+        <!-- ローカルログインフォーム -->
+        <form action="/login" method="POST" class="mb-4">
+          <input
+            type="text"
+            name="username"
+            placeholder="ユーザー名"
+            required
+            class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-3 focus:outline-none focus:border-blue-500"
+          >
+          <input
+            type="password"
+            name="password"
+            placeholder="パスワード"
+            required
+            class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500"
+          >
+          <button
+            type="submit"
+            class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
+            ログイン
+          </button>
+        </form>
+
+        <p class="text-center text-gray-500 mb-3">または</p>
+
+        <!-- Google ログインボタン（テキストボックスの下） -->
         <a href="/auth/google"
-           class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600 mt-4">
+           class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600">
           Googleでログイン
         </a>
 
-        <p class="text-center text-gray-500 mt-4">または</p>
+        <p class="text-center text-gray-500 mt-4">
+          アカウントをお持ちでないですか？
+        </p>
         <a href="/signup"
-           class="w-full block text-center text-blue-500 hover:text-blue-700 mt-4">
+           class="w-full block text-center text-blue-500 hover:text-blue-700 mt-1">
           Sign up
         </a>
       </div>
@@ -186,7 +221,42 @@ app.post('/signup', async (req, res) => {
   req.login(data, () => res.redirect('/'));
 });
 
-// ホーム（未ログインでも表示。投稿やモーダルはログイン必須）
+// ローカルログイン
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  const { data: user, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('username', username)
+    .single();
+
+  if (error || !user || !user.password) {
+    return res.send(
+      '<script>alert("ユーザー名またはパスワードが違います"); history.back();</script>'
+    );
+  }
+
+  const match = await bcrypt.compare(password, user.password);
+  if (!match) {
+    return res.send(
+      '<script>alert("ユーザー名またはパスワードが違います"); history.back();</script>'
+    );
+  }
+
+  req.login(user, (err) => {
+    if (err) {
+      return res.send(
+        '<script>alert("ログイン中にエラーが発生しました"); history.back();</script>'
+      );
+    }
+    return res.redirect('/');
+  });
+});
+
+// ホーム（未ログインでも閲覧可）
+// ・右上ボタン: 未ログインなら Log in（/login-modalへ）、ログイン時は Log out
+// ・投稿ボタン: 未ログインなら /login-modal へリダイレクト
 app.get('/', async (req, res) => {
   const { data: postsData } = await supabase
     .from('posts')
@@ -214,9 +284,10 @@ app.get('/', async (req, res) => {
   <!-- 右上 Log in / Log out ボタン（動的） -->
   <form id="logout-form" action="/logout" method="POST" style="display:none;"></form>
   <button
-    onclick="${isLoggedIn
-      ? "document.getElementById('logout-form').submit();"
-      : "location.href='/login-modal';"
+    onclick="${
+      isLoggedIn
+        ? "document.getElementById('logout-form').submit();"
+        : "location.href='/login-modal';"
     }"
     class="fixed top-6 right-6 bg-black text-white px-6 py-2 rounded-lg font-medium z-40 hover:bg-gray-800">
     ${isLoggedIn ? 'Log out' : 'Log in'}
@@ -274,9 +345,10 @@ app.get('/', async (req, res) => {
 
   <!-- 投稿ボタン（ログインチェック付き） -->
   <button
-    onclick="${isLoggedIn
-      ? "document.getElementById('modal').classList.remove('hidden');"
-      : "location.href='/login-modal';"
+    onclick="${
+      isLoggedIn
+        ? "document.getElementById('modal').classList.remove('hidden');"
+        : "location.href='/login-modal';"
     }"
     class="fixed bottom-6 right-6 w-44 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-xl font-bold z-[100] transition-all hover:scale-105">
     投稿する
