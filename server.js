@@ -27,6 +27,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
+      // デプロイ先が HTTPS なら production で true にしてOK
       secure: process.env.NODE_ENV === 'production',
       maxAge: 24 * 60 * 60 * 1000
     }
@@ -84,6 +85,7 @@ passport.use(
   )
 );
 
+// passport セッション用
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
   const { data: user } = await supabase
@@ -248,7 +250,7 @@ app.post('/signup', async (req, res) => {
     if (error) {
       console.error('Supabase signup error:', error);
 
-      // ユーザー名のユニーク制約に引っかかった場合（すでに存在する username）
+      // ユーザー名ユニーク制約に引っかかった場合
       if (error.code === '23505') {
         return res.send(`
           <script>
@@ -258,7 +260,6 @@ app.post('/signup', async (req, res) => {
         `);
       }
 
-      // その他のエラー
       return res.send(`
         <script>
           alert("エラー: ${error.message}");
@@ -267,7 +268,7 @@ app.post('/signup', async (req, res) => {
       `);
     }
 
-    // 正常に作成できたら、ログイン画面へ
+    // 正常に作成できたらログイン画面へ
     return res.redirect('/login-modal');
   } catch (e) {
     console.error('POST /signup error:', e);
@@ -279,7 +280,6 @@ app.post('/signup', async (req, res) => {
     `);
   }
 });
-
 
 // ローカルログイン（sign in）
 app.post('/login', async (req, res, next) => {
@@ -329,6 +329,7 @@ app.get('/', async (req, res) => {
     .from('posts')
     .select('*, users(username)')
     .order('time', { ascending: false });
+
   const posts = postsData || [];
   const isLoggedIn = !!req.user;
 
