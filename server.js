@@ -231,7 +231,7 @@ app.get('/signup', (req, res) => {
   `);
 });
 
-// ローカルサインアップ（ユーザー作成 → ログイン画面へ）
+// ローカルサインアップ（ユーザー作成）
 app.post('/signup', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -247,20 +247,39 @@ app.post('/signup', async (req, res) => {
 
     if (error) {
       console.error('Supabase signup error:', error);
-      return res.send(
-        '<script>alert("エラー: ' + error.message + '"); history.back();</script>'
-      );
+
+      // ユーザー名のユニーク制約に引っかかった場合（すでに存在する username）
+      if (error.code === '23505') {
+        return res.send(`
+          <script>
+            alert("そのユーザー名はすでに使われています。別のユーザー名を入力してください。");
+            history.back();
+          </script>
+        `);
+      }
+
+      // その他のエラー
+      return res.send(`
+        <script>
+          alert("エラー: ${error.message}");
+          history.back();
+        </script>
+      `);
     }
 
-    // ここではまだログインさせず、ログイン画面へ誘導
+    // 正常に作成できたら、ログイン画面へ
     return res.redirect('/login-modal');
   } catch (e) {
     console.error('POST /signup error:', e);
-    return res.send(
-      '<script>alert("サインアップ中にサーバーエラーが発生しました"); history.back();</script>'
-    );
+    return res.send(`
+      <script>
+        alert("サインアップ中にサーバーエラーが発生しました");
+        history.back();
+      </script>
+    `);
   }
 });
+
 
 // ローカルログイン（sign in）
 app.post('/login', async (req, res, next) => {
