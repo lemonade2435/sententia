@@ -233,18 +233,25 @@ app.get('/signup', (req, res) => {
 
 // ローカルサインアップ
 app.post('/signup', async (req, res) => {
-  const { username, password } = req.body;
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const { data, error } = await supabase
-    .from('users')
-    .insert({ username, password: hashedPassword })
-    .select()
-    .single();
-  if (error)
+  try {
+    const { username, password } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const { data, error } = await supabase
+      .from('users')
+      .insert({ username, password: hashedPassword })
+      .select()
+      .single();
+    if (error)
+      return res.send(
+        '<script>alert("エラー: ' + error.message + '"); history.back();</script>'
+      );
+    req.login(data, () => res.redirect('/'));
+  } catch (e) {
+    console.error('POST /signup error:', e);
     return res.send(
-      '<script>alert("エラー: ' + error.message + '"); history.back();</script>'
+      '<script>alert("サインアップ中にエラーが発生しました"); history.back();</script>'
     );
-  req.login(data, () => res.redirect('/'));
+  }
 });
 
 // ローカルログイン（sign in）
@@ -252,21 +259,19 @@ app.post('/login', async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
-    // ユーザー名で1件だけ取得（id / username / password だけ取れば十分）
+    // ユーザー取得
     const { data: user, error } = await supabase
       .from('users')
       .select('id, username, password')
       .eq('username', username)
       .single();
 
-    // ユーザーがいない or パスワードがない（Googleアカウントなど）の場合
     if (error || !user || !user.password) {
       return res.send(
         '<script>alert("ユーザー名またはパスワードが違います"); history.back();</script>'
       );
     }
 
-    // パスワードチェック
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
       return res.send(
@@ -274,7 +279,6 @@ app.post('/login', async (req, res, next) => {
       );
     }
 
-    // パスポートのセッションにログイン情報を保存
     req.login(user, (err) => {
       if (err) {
         console.error('req.login error:', err);
@@ -290,23 +294,6 @@ app.post('/login', async (req, res, next) => {
       '<script>alert("サーバーエラーが発生しました"); history.back();</script>'
     );
   }
-});
-
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) {
-    return res.send(
-      '<script>alert("ユーザー名またはパスワードが違います"); history.back();</script>'
-    );
-  }
-
-  req.login(user, (err) => {
-    if (err) {
-      return res.send(
-        '<script>alert("ログイン中にエラーが発生しました"); history.back();</script>'
-      );
-    }
-    return res.redirect('/');
-  });
 });
 
 // ホーム（未ログインでも閲覧可）
@@ -416,7 +403,7 @@ app.get('/', async (req, res) => {
       <form action="/post" method="POST">
         <div class="mb-8">
           <button type="button" onclick="this.nextElementSibling.classList.toggle('hidden')"
-                  class="w-full text-left text-xl font-medium flex itemscenter justify-between bg-gray-100 px-6 py-4 rounded-2xl">
+                  class="w-full text-left text-xl font-medium flex items-center justify-between bg-gray-100 px-6 py-4 rounded-2xl">
             <span id="selected-type">企業</span>
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
           </button>
