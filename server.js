@@ -1,6 +1,6 @@
 const express = require('express');
 const session = require('express-session');
-const RedisStore = require('connect-redis');
+const { default: RedisStore } = require('connect-redis'); // v7 の CJS 用読み込み
 const Redis = require('ioredis');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
@@ -14,7 +14,7 @@ app.use(express.urlencoded({ extended: true }));
 // Redisクライアント
 const redisClient = new Redis(process.env.UPSTASH_REDIS_URL);
 
-// セッション設定
+// セッション設定（Redisストアで永続化）
 const redisStore = new RedisStore({
   client: redisClient,
   prefix: 'sententia:'
@@ -25,7 +25,10 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'sententia-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production', maxAge: 24 * 60 * 60 * 1000 }
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000
+  }
 }));
 
 app.use(passport.initialize());
@@ -43,6 +46,7 @@ passport.use(new GoogleStrategy({
   callbackURL: '/auth/google/callback'
 }, async (accessToken, refreshToken, profile, done) => {
   try {
+    // 既存ユーザー確認
     let { data: user } = await supabase
       .from('users')
       .select('*')
@@ -50,6 +54,7 @@ passport.use(new GoogleStrategy({
       .single();
 
     if (!user) {
+      // 新規ユーザー作成
       const { data, error } = await supabase
         .from('users')
         .insert({
@@ -72,14 +77,19 @@ passport.use(new GoogleStrategy({
 
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
-  const { data: user } = await supabase.from('users').select('*').eq('id', id).single();
+  const { data: user } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', id)
+    .single();
   done(null, user);
 });
 
 // OAuthルート
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-app.get('/auth/google/callback',
+app.get(
+  '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/login-modal' }),
   (req, res) => res.redirect('/')
 );
@@ -91,18 +101,13 @@ app.get('/login-modal', (req, res) => {
     <!DOCTYPE html>
     <html lang="ja">
     <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Login - sententia</title><script src="https://cdn.tailwindcss.com"></script></head>
-    <body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
-      <div class="absolute inset-0 bg-black bg-opacity-50 z-0"></div> <!-- ホーム風背景を暗く -->
-      <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative z-10">
-        <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button> <!-- バツでホームに戻る -->
+    <body class="bg-gray-100 min-h-screen flex items-center justify-center">
+      <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
+        <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
         <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
-        <form action="/login" method="POST">
-          <input type="text" name="username" placeholder="ユーザー名" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
-          <input type="password" name="password" placeholder="パスワード" required class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-6 focus:outline-none focus:border-blue-500">
-          <button type="submit" class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600 mb-4">ログイン</button>
-        </form>
-        <a href="/auth/google" class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600">Googleでログイン</a> <!-- テキストボックス下にGoogleボタン -->
-        <p class="text-center text-gray-500 mt-4">アカウントをお持ちでないですか？ <a href="/signup" class="text-blue-500 hover:text-blue-700 font-medium">Sign up</a></p>
+        <a href="/auth/google" class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600 mb-4">Googleでログイン</a>
+        <p class="text-center text-gray-500">または</p>
+        <a href="/signup" class="w-full block text-center text-blue-500 hover:text-blue-700 mt-4">Sign up</a>
       </div>
     </body>
     </html>
@@ -114,9 +119,8 @@ app.get('/signup', (req, res) => {
     <!DOCTYPE html>
     <html lang="ja">
     <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Sign up - sententia</title><script src="https://cdn.tailwindcss.com"></script></head>
-    <body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
-      <div class="absolute inset-0 bg-black bg-opacity-50 z-0"></div>
-      <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative z-10">
+    <body class="bg-gray-100 min-h-screen flex items-center justify-center">
+      <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
         <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
         <h2 class="text-2xl font-bold text-center mb-6">アカウントを作成</h2>
         <form action="/signup" method="POST">
@@ -143,21 +147,6 @@ app.post('/signup', async (req, res) => {
   req.login(data, () => res.redirect('/'));
 });
 
-app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  const { data: user } = await supabase
-    .from('users')
-    .select('*')
-    .eq('username', username)
-    .single();
-
-  if (user && await bcrypt.compare(password, user.password)) {
-    req.login(user, () => res.redirect('/'));
-  } else {
-    res.send('<script>alert("ユーザー名かパスワードが間違っています"); location.href="/login-modal";</script>');
-  }
-});
-
 app.get('/', async (req, res) => {
   if (!req.user) return res.redirect('/login-modal');
   const { data: postsData } = await supabase
@@ -165,8 +154,6 @@ app.get('/', async (req, res) => {
     .select('*, users(username)')
     .order('time', { ascending: false });
   const posts = postsData || [];
-
-  const isLoggedIn = !!req.user; // ログイン状態チェック
 
   res.send(`
 <!DOCTYPE html>
@@ -184,10 +171,12 @@ app.get('/', async (req, res) => {
     <h1 class="text-3xl font-bold text-indigo-600">sententia</h1>
   </div>
 
-  <!-- 右上ボタン (動的: Log in / Log out) -->
-  <button onclick="${isLoggedIn ? 'location.href=\'/logout\';' : 'location.href=\'/login-modal\';'}" class="fixed top-6 right-6 bg-black text-white px-6 py-2 rounded-lg font-medium z-40 hover:bg-gray-800">
-    ${isLoggedIn ? 'Log out' : 'Log in'}
-  </button>
+  <!-- 右上 Log out ボタン -->
+  <form action="/logout" method="POST" style="display: inline;">
+    <button type="submit" class="fixed top-6 right-6 bg-black text-white px-6 py-2 rounded-lg font-medium z-40 hover:bg-gray-800">
+      Log out
+    </button>
+  </form>
 
   <!-- メインコンテンツ -->
   <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
@@ -220,13 +209,14 @@ app.get('/', async (req, res) => {
     </div>
   </div>
 
-  <!-- 投稿ボタン (未ログインなら/login-modalへ) -->
-  <button onclick="${isLoggedIn ? 'document.getElementById(\'modal\').classList.remove(\'hidden\');' : 'location.href=\'/login-modal\';'}" class="fixed bottom-6 right-6 w-44 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-xl font-bold z-[100] transition-all hover:scale-105">
+  <!-- 投稿ボタン -->
+  <button onclick="document.getElementById('modal').classList.remove('hidden')"
+          class="fixed bottom-6 right-6 w-44 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-xl font-bold z-[100] transition-all hover:scale-105">
     投稿する
   </button>
 
-  <!-- 投稿モーダル (ログイン済み時のみ) -->
-  <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+  <!-- 投稿モーダル -->
+  <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justifycenter z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
       <button onclick="document.getElementById('modal').classList.add('hidden')"
               class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
@@ -266,11 +256,12 @@ app.get('/', async (req, res) => {
   `);
 });
 
-app.post('/logout', (req, res) => {
+// logout は next を受け取るように
+app.post('/logout', (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
+    res.redirect('/login-modal');
   });
-  res.redirect('/login-modal');
 });
 
 app.post('/post', async (req, res) => {
@@ -279,7 +270,7 @@ app.post('/post', async (req, res) => {
     .from('posts')
     .insert({
       user_id: req.user.id,
-      type: req.body.type || "company",
+      type: req.body.type || 'company',
       text: req.body.opinion
     });
   if (error) return res.send('<script>alert("投稿エラー: ' + error.message + '"); history.back();</script>');
