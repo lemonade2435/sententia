@@ -248,20 +248,49 @@ app.post('/signup', async (req, res) => {
 });
 
 // ローカルログイン（sign in）
-app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+app.post('/login', async (req, res, next) => {
+  try {
+    const { username, password } = req.body;
 
-  const { data: user, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('username', username)
-    .single();
+    // ユーザー名で1件だけ取得（id / username / password だけ取れば十分）
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, username, password')
+      .eq('username', username)
+      .single();
 
-  if (error || !user || !user.password) {
+    // ユーザーがいない or パスワードがない（Googleアカウントなど）の場合
+    if (error || !user || !user.password) {
+      return res.send(
+        '<script>alert("ユーザー名またはパスワードが違います"); history.back();</script>'
+      );
+    }
+
+    // パスワードチェック
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.send(
+        '<script>alert("ユーザー名またはパスワードが違います"); history.back();</script>'
+      );
+    }
+
+    // パスポートのセッションにログイン情報を保存
+    req.login(user, (err) => {
+      if (err) {
+        console.error('req.login error:', err);
+        return res.send(
+          '<script>alert("ログイン中にエラーが発生しました"); history.back();</script>'
+        );
+      }
+      return res.redirect('/');
+    });
+  } catch (e) {
+    console.error('POST /login unexpected error:', e);
     return res.send(
-      '<script>alert("ユーザー名またはパスワードが違います"); history.back();</script>'
+      '<script>alert("サーバーエラーが発生しました"); history.back();</script>'
     );
   }
+});
 
   const match = await bcrypt.compare(password, user.password);
   if (!match) {
