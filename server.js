@@ -12,13 +12,13 @@ const path = require('path');
 
 const app = express();
 
-// Renderなどプロキシ環境で secure cookie を正しく扱うため
+// プロキシ越し(HTTPS)で secure cookie を正しく扱う
 app.set('trust proxy', 1);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// /public 以下のファイルを / 直下で配信（/logo.png など）
+// /public 以下を静的配信（/logo.png など）
 app.use(express.static(path.join(__dirname, 'public')));
 
 // =============================
@@ -56,7 +56,6 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // =============================
 // Passport (Google OAuth)
 // =============================
-
 passport.use(
   new GoogleStrategy(
     {
@@ -72,6 +71,7 @@ passport.use(
           .eq('google_id', profile.id)
           .single();
 
+        // PGRST116 = 行が見つからない → 無視して新規作成へ
         if (error && error.code !== 'PGRST116') {
           return done(error);
         }
@@ -84,7 +84,7 @@ passport.use(
 
           const baseName =
             profile.displayName ||
-            (email ? email.split('@')[0] : `user_${Date.now()}`);
+            (email ? email.split('@')[0] : 'user_' + Date.now());
 
           let username = baseName.slice(0, 20);
 
@@ -138,9 +138,12 @@ function ensureAuthenticated(req, res, next) {
 }
 
 // =============================
-// OAuthルート
+// OAuth ルート
 // =============================
-app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+app.get(
+  '/auth/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] })
+);
 
 app.get(
   '/auth/google/callback',
@@ -149,19 +152,20 @@ app.get(
 );
 
 // =============================
-// ログイン / サインアップ画面
+// ログインモーダル（背景にホーム＋暗く）
 // =============================
-
 app.get('/login-modal', async (req, res) => {
   const { data: postsData } = await supabase
     .from('posts')
-    .select('id, user_id, type, text, time, parent_post_id, users(username, handle)')
+    .select(
+      'id, user_id, type, text, time, parent_post_id, users(username, handle)'
+    )
     .order('time', { ascending: false })
     .limit(10);
 
   const posts = postsData || [];
 
-  res.send(`
+  const html = `
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -172,6 +176,7 @@ app.get('/login-modal', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen relative">
 
+  <!-- 背景（ホーム風） -->
   <div class="pointer-events-none opacity-40">
     <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
       <div class="flex items-center gap-3 mb-6">
@@ -181,48 +186,58 @@ app.get('/login-modal', async (req, res) => {
       </div>
       <div class="space-y-4">
         ${posts
-          .map(
-            (p) => `
-        <div class="bg-white rounded-2xl p-4 shadow-sm">
-          <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
-              <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-              </svg>
-            </div>
-            <div class="flex-1">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="text-sm font-semibold">${p.users?.username || 'ユーザー'}</div>
-                  <div class="text-xs text-gray-500">${p.users?.handle || '@user'}</div>
-                </div>
-                <div class="flex items-center gap-2 text-xs text-gray-500">
-                  <span class="px-2 py-0.5 rounded-full text-xs font-medium ${
-                    p.type === 'company'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-purple-100 text-purple-700'
-                  }">
-                    ${p.type === 'company' ? '企業' : '物事'}
-                  </span>
-                  <span>${new Date(p.time).toLocaleString('ja-JP', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}</span>
-                </div>
-              </div>
-              <p class="mt-2 text-sm break-words">${p.text}</p>
-            </div>
-          </div>
-        </div>
-        `
-          )
+          .map(function (p) {
+            return (
+              '<div class="bg-white rounded-2xl p-4 shadow-sm">' +
+              '<div class="flex items-start gap-3">' +
+              '<div class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">' +
+              '<svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">' +
+              '<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>' +
+              '</svg>' +
+              '</div>' +
+              '<div class="flex-1">' +
+              '<div class="flex items-center justify-between">' +
+              '<div>' +
+              '<div class="text-sm font-semibold">' +
+              (p.users && p.users.username ? p.users.username : 'ユーザー') +
+              '</div>' +
+              '<div class="text-xs text-gray-500">' +
+              (p.users && p.users.handle ? p.users.handle : '@user') +
+              '</div>' +
+              '</div>' +
+              '<div class="flex items-center gap-2 text-xs text-gray-500">' +
+              '<span class="px-2 py-0.5 rounded-full text-xs font-medium ' +
+              (p.type === 'company'
+                ? 'bg-blue-100 text-blue-700'
+                : 'bg-purple-100 text-purple-700') +
+              '">' +
+              (p.type === 'company' ? '企業' : '物事') +
+              '</span>' +
+              '<span>' +
+              new Date(p.time).toLocaleString('ja-JP', {
+                hour: '2-digit',
+                minute: '2-digit'
+              }) +
+              '</span>' +
+              '</div>' +
+              '</div>' +
+              '<p class="mt-2 text-sm break-words">' +
+              p.text +
+              '</p>' +
+              '</div>' +
+              '</div>' +
+              '</div>'
+            );
+          })
           .join('')}
       </div>
     </div>
   </div>
 
+  <!-- 暗くするオーバーレイ -->
   <div class="absolute inset-0 bg-black bg-opacity-60 z-0"></div>
 
+  <!-- 中央ログインモーダル -->
   <div class="absolute inset-0 flex items-center justify-center z-10">
     <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
       <button onclick="location.href='/'"
@@ -256,11 +271,16 @@ app.get('/login-modal', async (req, res) => {
   </div>
 </body>
 </html>
-  `);
+`;
+
+  res.send(html);
 });
 
+// =============================
+// サインアップ画面
+// =============================
 app.get('/signup', (req, res) => {
-  res.send(`
+  const html = `
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -306,12 +326,18 @@ app.get('/signup', (req, res) => {
       </button>
     </form>
 
+    <a href="/auth/google"
+       class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600 mt-4">
+      Googleでサインアップ / ログイン
+    </a>
+
     <p class="text-center text-gray-500 mt-4 cursor-pointer hover:text-blue-500"
        onclick="location.href='/login-modal'">
       すでにアカウントをお持ちですか？ Log in
     </p>
   </div>
 
+  <!-- 利用規約モーダル -->
   <div id="tos-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-6 relative">
       <button onclick="closeModal('tos-modal')"
@@ -327,6 +353,7 @@ app.get('/signup', (req, res) => {
     </div>
   </div>
 
+  <!-- プライバシーポリシーモーダル -->
   <div id="privacy-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-6 relative">
       <button onclick="closeModal('privacy-modal')"
@@ -351,26 +378,42 @@ app.get('/signup', (req, res) => {
   </script>
 </body>
 </html>
-  `);
+`;
+
+  res.send(html);
 });
 
+// =============================
+// サインアップ POST
+// =============================
 app.post('/signup', async (req, res) => {
   try {
-    const { username, password, handle } = req.body;
+    const username = req.body.username;
+    const password = req.body.password;
+    let handle = req.body.handle;
 
-if (!username || username.length < 1 || username.length > 20) {
-  return res.send('<script>alert("ユーザー名は1〜20文字で入力してください。"); history.back();</script>');
-}
+    if (!username || username.length < 1 || username.length > 20) {
+      return res.send(
+        '<script>alert("ユーザー名は1〜20文字で入力してください。"); history.back();</script>'
+      );
+    }
 
-    let finalHandle = handle?.trim();
-    if (finalHandle) {
-      if (!finalHandle.startsWith('@')) finalHandle = '@' + finalHandle;
-      if (finalHandle.length > 20) {
+    if (!password) {
+      return res.send(
+        '<script>alert("パスワードを入力してください。"); history.back();</script>'
+      );
+    }
+
+    if (handle) {
+      handle = handle.trim();
+      if (!handle.startsWith('@')) handle = '@' + handle;
+      if (handle.length > 20) {
         return res.send(
-          '<script>alert("ユーザーID（@〜）は20文字以内で入力してください。"); history.back();</script>');
+          '<script>alert("ユーザーID（@〜）は20文字以内で入力してください。"); history.back();</script>'
+        );
       }
     } else {
-      finalHandle = null;
+      handle = null;
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -378,16 +421,18 @@ if (!username || username.length < 1 || username.length > 20) {
     const { data, error } = await supabase
       .from('users')
       .insert({
-        username,
+        username: username,
         password: hashedPassword,
-        handle: finalHandle
+        handle: handle
       })
       .select()
       .single();
 
     if (error) {
       return res.send(
-        '<script>alert("サインアップエラー: \${error.message}"); history.back();</script>'
+        '<script>alert("サインアップエラー: ' +
+          error.message +
+          '"); history.back();</script>'
       );
     }
 
@@ -400,8 +445,13 @@ if (!username || username.length < 1 || username.length > 20) {
   }
 });
 
+// =============================
+// ログイン POST
+// =============================
 app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+  const username = req.body.username;
+  const password = req.body.password;
+
   try {
     const { data: user, error } = await supabase
       .from('users')
@@ -432,11 +482,11 @@ app.post('/login', async (req, res) => {
 });
 
 // =============================
-// 設定
+// 設定画面
 // =============================
 app.get('/settings', ensureAuthenticated, (req, res) => {
   const user = req.user;
-  res.send(`
+  const html = `
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -504,39 +554,44 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
   </div>
 </body>
 </html>
-  `);
+`;
+
+  res.send(html);
 });
 
 app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
-  const { username, handle } = req.body;
+  const username = req.body.username;
+  let handle = req.body.handle;
   const userId = req.user.id;
 
-  if (!username || username.length > 20) {
+  if (!username || username.length < 1 || username.length > 20) {
     return res.send(
       '<script>alert("ユーザー名は1〜20文字で入力してください。"); history.back();</script>'
     );
   }
 
-  let finalHandle = handle?.trim();
-  if (finalHandle) {
-    if (!finalHandle.startsWith('@')) finalHandle = '@' + finalHandle;
-    if (finalHandle.length > 20) {
+  if (handle) {
+    handle = handle.trim();
+    if (!handle.startsWith('@')) handle = '@' + handle;
+    if (handle.length > 20) {
       return res.send(
         '<script>alert("ユーザーID（@〜）は20文字以内で入力してください。"); history.back();</script>'
       );
     }
   } else {
-    finalHandle = null;
+    handle = null;
   }
 
   const { error } = await supabase
     .from('users')
-    .update({ username, handle: finalHandle })
+    .update({ username: username, handle: handle })
     .eq('id', userId);
 
   if (error) {
     return res.send(
-      '<script>alert("更新エラー: ${error.message}"); history.back();</script>'
+      '<script>alert("更新エラー: ' +
+        error.message +
+        '"); history.back();</script>'
     );
   }
 
@@ -547,14 +602,15 @@ app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
     .single();
 
   req.login(updatedUser, () => {
-    res.send('<script>alert("更新しました。"); location.href="/settings";</script>');
+    res.send(
+      '<script>alert("更新しました。"); location.href="/settings";</script>'
+    );
   });
 });
 
 // =============================
 // プロフィール
 // =============================
-
 app.get('/me', ensureAuthenticated, (req, res) => {
   res.redirect('/profile/' + req.user.id);
 });
@@ -575,7 +631,9 @@ app.get('/profile/:id', async (req, res) => {
 
   const { data: postsData } = await supabase
     .from('posts')
-    .select('id, user_id, type, text, time, parent_post_id, users(username, handle)')
+    .select(
+      'id, user_id, type, text, time, parent_post_id, users(username, handle)'
+    )
     .eq('user_id', profileUserId)
     .order('time', { ascending: false });
 
@@ -588,27 +646,36 @@ app.get('/profile/:id', async (req, res) => {
     .eq('user_id', profileUserId);
 
   if (likesData && likesData.length > 0) {
-    const postIds = likesData.map((l) => l.post_id);
+    const postIds = likesData.map(function (l) {
+      return l.post_id;
+    });
     const { data: likedData } = await supabase
       .from('posts')
-      .select('id, user_id, type, text, time, parent_post_id, users(username, handle)')
+      .select(
+        'id, user_id, type, text, time, parent_post_id, users(username, handle)'
+      )
       .in('id', postIds)
       .order('time', { ascending: false });
 
     likedPosts = likedData || [];
   }
 
-  const allPosts = [...userPosts, ...likedPosts];
-  let likesMap = {};
+  const allPosts = userPosts.concat(likedPosts);
+  const likesMap = {};
+
   if (allPosts.length > 0) {
-    const ids = [...new Set(allPosts.map((p) => p.id))];
+    const ids = [];
+    allPosts.forEach(function (p) {
+      if (ids.indexOf(p.id) === -1) ids.push(p.id);
+    });
+
     const { data: likesForAll } = await supabase
       .from('likes')
       .select('post_id, user_id')
       .in('post_id', ids);
 
     if (likesForAll) {
-      likesForAll.forEach((like) => {
+      likesForAll.forEach(function (like) {
         if (!likesMap[like.post_id]) {
           likesMap[like.post_id] = { count: 0, likedByViewer: false };
         }
@@ -623,63 +690,74 @@ app.get('/profile/:id', async (req, res) => {
   function renderPostCard(p) {
     const likeInfo = likesMap[p.id] || { count: 0, likedByViewer: false };
     const likeIcon = likeInfo.likedByViewer ? '❤️' : '🤍';
-    return `
-      <div class="bg-white rounded-2xl p-4 shadow-md">
-        <div class="flex items-start gap-3">
-          <button onclick="location.href='/profile/${p.user_id}'"
-                  class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
-            <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
-              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-            </svg>
-          </button>
-          <div class="flex-1">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-sm font-semibold">${p.users?.username || 'ユーザー'}</div>
-                <div class="text-xs text-gray-500">${p.users?.handle || '@user'}</div>
-              </div>
-              <div class="flex items-center gap-2 text-xs text-gray-500">
-                <span class="px-2 py-0.5 rounded-full text-xs font-medium ${
-                  p.type === 'company'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-purple-100 text-purple-700'
-                }">
-                  ${p.type === 'company' ? '企業' : '物事'}
-                </span>
-                <span>${new Date(p.time).toLocaleString('ja-JP', {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}</span>
-              </div>
-            </div>
-            <p class="mt-2 text-sm whitespace-pre-wrap break-words">${p.text}</p>
-            <div class="mt-3 flex items-center gap-6 text-sm text-gray-500">
-              <button type="button"
-                      onclick="${
-                        viewer
-                          ? \`location.href='/?replyTo=\${p.id}'\`
-                          : 'location.href=\\'/login-modal\\''
-                      }"
-                      class="flex items-center gap-1 hover:text-blue-500">
-                💬
-              </button>
-              <button type="button"
-                      onclick="${
-                        viewer
-                          ? \`handleLike('\${p.id}')\`
-                          : 'location.href=\\'/login-modal\\''
-                      }"
-                      class="flex items-center gap-1 hover:text-pink-500">
-                <span>${likeIcon}</span><span>${likeInfo.count}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
+
+    return (
+      '<div class="bg-white rounded-2xl p-4 shadow-md">' +
+      '<div class="flex items-start gap-3">' +
+      '<button onclick="location.href=\'/profile/' +
+      p.user_id +
+      '\'"' +
+      '        class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">' +
+      '  <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">' +
+      '    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>' +
+      '  </svg>' +
+      '</button>' +
+      '<div class="flex-1">' +
+      '<div class="flex items-center justify-between">' +
+      '<div>' +
+      '<div class="text-sm font-semibold">' +
+      (p.users && p.users.username ? p.users.username : 'ユーザー') +
+      '</div>' +
+      '<div class="text-xs text-gray-500">' +
+      (p.users && p.users.handle ? p.users.handle : '@user') +
+      '</div>' +
+      '</div>' +
+      '<div class="flex items-center gap-2 text-xs text-gray-500">' +
+      '<span class="px-2 py-0.5 rounded-full text-xs font-medium ' +
+      (p.type === 'company'
+        ? 'bg-blue-100 text-blue-700'
+        : 'bg-purple-100 text-purple-700') +
+      '">' +
+      (p.type === 'company' ? '企業' : '物事') +
+      '</span>' +
+      '<span>' +
+      new Date(p.time).toLocaleString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit'
+      }) +
+      '</span>' +
+      '</div>' +
+      '</div>' +
+      '<p class="mt-2 text-sm whitespace-pre-wrap break-words">' +
+      p.text +
+      '</p>' +
+      '<div class="mt-3 flex items-center gap-6 text-sm text-gray-500">' +
+      '<button type="button"' +
+      (viewer
+        ? '        onclick="location.href=\'/?replyTo=' + p.id + '\'"'
+        : '        onclick="location.href=\'/login-modal\'"') +
+      '        class="flex items-center gap-1 hover:text-blue-500">' +
+      '  💬' +
+      '</button>' +
+      '<button type="button"' +
+      (viewer
+        ? '        onclick="handleLike(\'' + p.id + '\')"'
+        : '        onclick="location.href=\'/login-modal\'"') +
+      '        class="flex items-center gap-1 hover:text-pink-500">' +
+      '  <span>' +
+      likeIcon +
+      '</span><span>' +
+      likeInfo.count +
+      '</span>' +
+      '</button>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+      '</div>'
+    );
   }
 
-  res.send(`
+  const html = `
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -696,14 +774,11 @@ app.get('/profile/:id', async (req, res) => {
     </button>
     ${
       viewer
-        ? `
-    <button onclick="location.href='/me'"
-            class="w-9 h-9 rounded-full flex items-center justify-center bg-blue-100">
-      <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-500" fill="currentColor">
-        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-      </svg>
-    </button>
-    `
+        ? '<button onclick="location.href=\'/me\'" class="w-9 h-9 rounded-full flex items-center justify-center bg-blue-100">' +
+          '<svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-500" fill="currentColor">' +
+          '<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>' +
+          '</svg>' +
+          '</button>'
         : ''
     }
   </div>
@@ -711,24 +786,11 @@ app.get('/profile/:id', async (req, res) => {
   <div class="fixed top-6 right-6 z-40 flex items-center gap-3">
     ${
       viewer
-        ? `
-      <button onclick="location.href='/settings'"
-              class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">
-        ⚙️
-      </button>
-      <form action="/logout" method="POST">
-        <button type="submit"
-                class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-          Log out
-        </button>
-      </form>
-    `
-        : `
-      <button onclick="location.href='/login-modal'"
-              class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-        Log in
-      </button>
-    `
+        ? '<button onclick="location.href=\'/settings\'" class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">⚙️</button>' +
+          '<form action="/logout" method="POST">' +
+          '<button type="submit" class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">Log out</button>' +
+          '</form>'
+        : '<button onclick="location.href=\'/login-modal\'" class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">Log in</button>'
     }
   </div>
 
@@ -741,8 +803,12 @@ app.get('/profile/:id', async (req, res) => {
           </svg>
         </div>
         <div>
-          <div class="text-xl font-bold">${profileUser.username || 'ユーザー'}</div>
-          <div class="text-sm text-gray-500">${profileUser.handle || '@user'}</div>
+          <div class="text-xl font-bold">${
+            profileUser.username || 'ユーザー'
+          }</div>
+          <div class="text-sm text-gray-500">${
+            profileUser.handle || '@user'
+          }</div>
         </div>
       </div>
     </div>
@@ -761,26 +827,26 @@ app.get('/profile/:id', async (req, res) => {
     <div id="tab-posts-panel" class="space-y-4">
       ${
         userPosts.length === 0
-          ? `<p class="text-gray-500 text-sm">まだ投稿がありません。</p>`
-          : userPosts.map((p) => renderPostCard(p)).join('')
+          ? '<p class="text-gray-500 text-sm">まだ投稿がありません。</p>'
+          : userPosts.map(renderPostCard).join('')
       }
     </div>
 
     <div id="tab-likes-panel" class="space-y-4 hidden">
       ${
         likedPosts.length === 0
-          ? `<p class="text-gray-500 text-sm">まだいいねした投稿がありません。</p>`
-          : likedPosts.map((p) => renderPostCard(p)).join('')
+          ? '<p class="text-gray-500 text-sm">まだいいねした投稿がありません。</p>'
+          : likedPosts.map(renderPostCard).join('')
       }
     </div>
   </div>
 
   <script>
     function showTab(tab) {
-      const postsBtn = document.getElementById('tab-posts');
-      const likesBtn = document.getElementById('tab-likes');
-      const postsPanel = document.getElementById('tab-posts-panel');
-      const likesPanel = document.getElementById('tab-likes-panel');
+      var postsBtn = document.getElementById('tab-posts');
+      var likesBtn = document.getElementById('tab-likes');
+      var postsPanel = document.getElementById('tab-posts-panel');
+      var likesPanel = document.getElementById('tab-likes-panel');
 
       if (tab === 'posts') {
         postsBtn.classList.add('border-blue-500');
@@ -801,7 +867,7 @@ app.get('/profile/:id', async (req, res) => {
 
     async function handleLike(postId) {
       try {
-        const res = await fetch('/like/' + postId, { method: 'POST' });
+        var res = await fetch('/like/' + postId, { method: 'POST' });
         if (res.ok) {
           location.reload();
         } else {
@@ -814,13 +880,14 @@ app.get('/profile/:id', async (req, res) => {
   </script>
 </body>
 </html>
-  `);
+`;
+
+  res.send(html);
 });
 
 // =============================
 // ホーム
 // =============================
-
 app.get('/', async (req, res) => {
   const user = req.user;
   const search = (req.query.q || '').trim();
@@ -828,26 +895,31 @@ app.get('/', async (req, res) => {
 
   let postsQuery = supabase
     .from('posts')
-    .select('id, user_id, type, text, time, parent_post_id, users(username, handle)')
+    .select(
+      'id, user_id, type, text, time, parent_post_id, users(username, handle)'
+    )
     .order('time', { ascending: false });
 
   if (search) {
-    postsQuery = postsQuery.ilike('text', `%${search}%`);
+    postsQuery = postsQuery.ilike('text', '%' + search + '%');
   }
 
   const { data: postsData, error: postsError } = await postsQuery;
   const posts = postsError || !postsData ? [] : postsData;
 
-  let likesMap = {};
+  const likesMap = {};
   if (posts.length > 0) {
-    const postIds = posts.map((p) => p.id);
+    const postIds = posts.map(function (p) {
+      return p.id;
+    });
+
     const { data: likesData } = await supabase
       .from('likes')
       .select('post_id, user_id')
       .in('post_id', postIds);
 
     if (likesData) {
-      likesData.forEach((like) => {
+      likesData.forEach(function (like) {
         if (!likesMap[like.post_id]) {
           likesMap[like.post_id] = { count: 0, likedByUser: false };
         }
@@ -859,16 +931,23 @@ app.get('/', async (req, res) => {
     }
   }
 
-  const topPosts = posts.filter((p) => !p.parent_post_id);
+  const topPosts = posts.filter(function (p) {
+    return !p.parent_post_id;
+  });
+
   const repliesByParent = {};
   posts
-    .filter((p) => p.parent_post_id)
-    .forEach((p) => {
-      if (!repliesByParent[p.parent_post_id]) repliesByParent[p.parent_post_id] = [];
+    .filter(function (p) {
+      return p.parent_post_id;
+    })
+    .forEach(function (p) {
+      if (!repliesByParent[p.parent_post_id]) {
+        repliesByParent[p.parent_post_id] = [];
+      }
       repliesByParent[p.parent_post_id].push(p);
     });
 
-  res.send(`
+  const html = `
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -885,14 +964,11 @@ app.get('/', async (req, res) => {
     </button>
     ${
       user
-        ? `
-    <button onclick="location.href='/me'"
-            class="w-9 h-9 rounded-full flex items-center justify-center bg-blue-100">
-      <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-500" fill="currentColor">
-        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-      </svg>
-    </button>
-    `
+        ? '<button onclick="location.href=\'/me\'" class="w-9 h-9 rounded-full flex items-center justify-center bg-blue-100">' +
+          '<svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-500" fill="currentColor">' +
+          '<path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>' +
+          '</svg>' +
+          '</button>'
         : ''
     }
   </div>
@@ -900,24 +976,11 @@ app.get('/', async (req, res) => {
   <div class="fixed top-6 right-6 z-40 flex items-center gap-3">
     ${
       user
-        ? `
-      <button onclick="location.href='/settings'"
-              class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">
-        ⚙️
-      </button>
-      <form action="/logout" method="POST">
-        <button type="submit"
-                class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-          Log out
-        </button>
-      </form>
-    `
-        : `
-      <button onclick="location.href='/login-modal'"
-              class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-        Log in
-      </button>
-    `
+        ? '<button onclick="location.href=\'/settings\'" class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">⚙️</button>' +
+          '<form action="/logout" method="POST">' +
+          '<button type="submit" class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">Log out</button>' +
+          '</form>'
+        : '<button onclick="location.href=\'/login-modal\'" class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">Log in</button>'
     }
   </div>
 
@@ -941,108 +1004,129 @@ app.get('/', async (req, res) => {
         topPosts.length === 0
           ? '<p class="text-gray-500">まだ投稿がありません。</p>'
           : topPosts
-              .map((p) => {
+              .map(function (p) {
                 const likeInfo = likesMap[p.id] || {
                   count: 0,
                   likedByUser: false
                 };
                 const likeIcon = likeInfo.likedByUser ? '❤️' : '🤍';
                 const replies = repliesByParent[p.id] || [];
-                return `
-        <div class="bg-white rounded-2xl p-4 shadow-md">
-          <div class="flex items-start gap-3">
-            <button onclick="location.href='/profile/${p.user_id}'"
-                    class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
-              <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-              </svg>
-            </button>
 
-            <div class="flex-1">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="text-sm font-semibold">${p.users?.username || 'ユーザー'}</div>
-                  <div class="text-xs text-gray-500">${p.users?.handle || '@user'}</div>
-                </div>
-                <div class="flex items-center gap-2 text-xs text-gray-500">
-                  <span class="px-2 py-0.5 rounded-full text-xs font-medium ${
-                    p.type === 'company'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-purple-100 text-purple-700'
-                  }">
-                    ${p.type === 'company' ? '企業' : '物事'}
-                  </span>
-                  <span>${new Date(p.time).toLocaleString('ja-JP', {
+                let repliesHtml = '';
+                if (replies.length > 0) {
+                  repliesHtml =
+                    '<div class="mt-3 border-l pl-4 space-y-2">' +
+                    replies
+                      .map(function (r) {
+                        return (
+                          '<div class="flex items-start gap-2">' +
+                          '<button onclick="location.href=\'/profile/' +
+                          r.user_id +
+                          '\'"' +
+                          '        class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50">' +
+                          '  <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-400" fill="currentColor">' +
+                          '    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>' +
+                          '  </svg>' +
+                          '</button>' +
+                          '<div class="flex-1">' +
+                          '<div class="flex items-center justify-between">' +
+                          '<div>' +
+                          '<div class="text-xs font-semibold">' +
+                          (r.users && r.users.username
+                            ? r.users.username
+                            : 'ユーザー') +
+                          '</div>' +
+                          '<div class="text-[11px] text-gray-500">' +
+                          (r.users && r.users.handle
+                            ? r.users.handle
+                            : '@user') +
+                          '</div>' +
+                          '</div>' +
+                          '<span class="text-[11px] text-gray-400">' +
+                          new Date(r.time).toLocaleString('ja-JP', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) +
+                          '</span>' +
+                          '</div>' +
+                          '<p class="mt-1 text-xs whitespace-pre-wrap break-words">' +
+                          r.text +
+                          '</p>' +
+                          '</div>' +
+                          '</div>'
+                        );
+                      })
+                      .join('') +
+                    '</div>';
+                }
+
+                return (
+                  '<div class="bg-white rounded-2xl p-4 shadow-md">' +
+                  '<div class="flex items-start gap-3">' +
+                  '<button onclick="location.href=\'/profile/' +
+                  p.user_id +
+                  '\'"' +
+                  '        class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">' +
+                  '  <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">' +
+                  '    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>' +
+                  '  </svg>' +
+                  '</button>' +
+                  '<div class="flex-1">' +
+                  '<div class="flex items-center justify-between">' +
+                  '<div>' +
+                  '<div class="text-sm font-semibold">' +
+                  (p.users && p.users.username ? p.users.username : 'ユーザー') +
+                  '</div>' +
+                  '<div class="text-xs text-gray-500">' +
+                  (p.users && p.users.handle ? p.users.handle : '@user') +
+                  '</div>' +
+                  '</div>' +
+                  '<div class="flex items-center gap-2 text-xs text-gray-500">' +
+                  '<span class="px-2 py-0.5 rounded-full text-xs font-medium ' +
+                  (p.type === 'company'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-purple-100 text-purple-700') +
+                  '">' +
+                  (p.type === 'company' ? '企業' : '物事') +
+                  '</span>' +
+                  '<span>' +
+                  new Date(p.time).toLocaleString('ja-JP', {
                     hour: '2-digit',
                     minute: '2-digit'
-                  })}</span>
-                </div>
-              </div>
-
-              <p class="mt-2 text-sm whitespace-pre-wrap break-words">${p.text}</p>
-
-              <div class="mt-3 flex items-center gap-6 text-sm text-gray-500">
-                <button type="button"
-                        onclick="${
-                          user
-                            ? `openPostModal('${p.id}')`
-                            : `location.href='/login-modal'`
-                        }"
-                        class="flex items-center gap-1 hover:text-blue-500">
-                  💬<span>${replies.length}</span>
-                </button>
-                <button type="button"
-                        onclick="${
-                          user
-                            ? `handleLike('${p.id}')`
-                            : `location.href='/login-modal'`
-                        }"
-                        class="flex items-center gap-1 hover:text-pink-500">
-                  <span>${likeIcon}</span><span>${likeInfo.count}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          ${
-            replies.length > 0
-              ? `
-            <div class="mt-3 border-l pl-4 space-y-2">
-              ${replies
-                .map(
-                  (r) => `
-                <div class="flex items-start gap-2">
-                  <button onclick="location.href='/profile/${r.user_id}'"
-                          class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50">
-                    <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-400" fill="currentColor">
-                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-                    </svg>
-                  </button>
-                  <div class="flex-1">
-                    <div class="flex items-center justify-between">
-                      <div>
-                        <div class="text-xs font-semibold">${r.users?.username || 'ユーザー'}</div>
-                        <div class="text-[11px] text-gray-500">${r.users?.handle || '@user'}</div>
-                      </div>
-                      <span class="text-[11px] text-gray-400">
-                        ${new Date(r.time).toLocaleString('ja-JP', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
-                    </div>
-                    <p class="mt-1 text-xs whitespace-pre-wrap break-words">${r.text}</p>
-                  </div>
-                </div>
-              `
-                )
-                .join('')}
-            </div>
-          `
-              : ''
-          }
-        </div>
-      `;
+                  }) +
+                  '</span>' +
+                  '</div>' +
+                  '</div>' +
+                  '<p class="mt-2 text-sm whitespace-pre-wrap break-words">' +
+                  p.text +
+                  '</p>' +
+                  '<div class="mt-3 flex items-center gap-6 text-sm text-gray-500">' +
+                  '<button type="button"' +
+                  (user
+                    ? '        onclick="openPostModal(\'' + p.id + '\')"'
+                    : '        onclick="location.href=\'/login-modal\'"') +
+                  '        class="flex items-center gap-1 hover:text-blue-500">' +
+                  '  💬<span>' +
+                  replies.length +
+                  '</span>' +
+                  '</button>' +
+                  '<button type="button"' +
+                  (user
+                    ? '        onclick="handleLike(\'' + p.id + '\')"'
+                    : '        onclick="location.href=\'/login-modal\'"') +
+                  '        class="flex items-center gap-1 hover:text-pink-500">' +
+                  '  <span>' +
+                  likeIcon +
+                  '</span><span>' +
+                  likeInfo.count +
+                  '</span>' +
+                  '</button>' +
+                  '</div>' +
+                  '</div>' +
+                  '</div>' +
+                  repliesHtml +
+                  '</div>'
+                );
               })
               .join('')
       }
@@ -1058,13 +1142,14 @@ app.get('/', async (req, res) => {
     投稿する
   </button>
 
+  <!-- 投稿モーダル -->
   <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
       <button onclick="closePostModal()"
               class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
 
       <form action="/post" method="POST">
-        <input type="hidden" name="parent_post_id" id="parent_post_id_input" value="${replyTo || ''}">
+        <input type="hidden" name="parent_post_id" id="parent_post_id_input" value="${replyTo}">
 
         <div class="mb-8">
           <button type="button" onclick="this.nextElementSibling.classList.toggle('hidden')"
@@ -1105,8 +1190,8 @@ app.get('/', async (req, res) => {
 
   <script>
     function openPostModal(parentId) {
-      const modal = document.getElementById('modal');
-      const input = document.getElementById('parent_post_id_input');
+      var modal = document.getElementById('modal');
+      var input = document.getElementById('parent_post_id_input');
       input.value = parentId || '';
       modal.classList.remove('hidden');
     }
@@ -1118,15 +1203,15 @@ app.get('/', async (req, res) => {
 
     ${
       replyTo
-        ? "document.addEventListener('DOMContentLoaded', () => openPostModal('" +
+        ? "document.addEventListener('DOMContentLoaded', function () { openPostModal('" +
           replyTo +
-          "'));"
+          "'); });"
         : ''
     }
 
     async function handleLike(postId) {
       try {
-        const res = await fetch('/like/' + postId, { method: 'POST' });
+        var res = await fetch('/like/' + postId, { method: 'POST' });
         if (res.ok) {
           location.reload();
         } else {
@@ -1139,24 +1224,30 @@ app.get('/', async (req, res) => {
   </script>
 </body>
 </html>
-  `);
+`;
+
+  res.send(html);
 });
 
 // =============================
 // ログアウト
 // =============================
 app.post('/logout', (req, res, next) => {
-  req.logout((err) => {
+  req.logout(function (err) {
     if (err) return next(err);
     res.redirect('/login-modal');
   });
 });
 
+// =============================
 // 投稿
+// =============================
 app.post('/post', ensureAuthenticated, async (req, res) => {
-  const { type, opinion, parent_post_id } = req.body;
+  const type = req.body.type;
+  const opinion = req.body.opinion;
+  const parent_post_id = req.body.parent_post_id;
 
-  if (!opinion || opinion.length === 0 || opinion.length > 200) {
+  if (!opinion || opinion.length < 1 || opinion.length > 200) {
     return res.send(
       '<script>alert("投稿は1〜200文字で入力してください。"); history.back();</script>'
     );
@@ -1176,19 +1267,20 @@ app.post('/post', ensureAuthenticated, async (req, res) => {
 
   if (error) {
     return res.send(
-      `<script>alert("投稿エラー: ${error.message}"); history.back();</script>`
+      '<script>alert("投稿エラー: ' +
+        error.message +
+        '"); history.back();</script>'
     );
   }
 
-  res.send(`
-    <script>
-      alert('投稿完了！');
-      location.href = '/';
-    </script>
-  `);
+  res.send(
+    '<script>alert("投稿完了！"); location.href = "/";</script>'
+  );
 });
 
+// =============================
 // いいねトグル
+// =============================
 app.post('/like/:postId', ensureAuthenticated, async (req, res) => {
   const postId = req.params.postId;
   const userId = req.user.id;
@@ -1217,12 +1309,10 @@ app.post('/like/:postId', ensureAuthenticated, async (req, res) => {
         return res.status(500).send('error');
       }
     } else {
-      const { error: insertError } = await supabase
-        .from('likes')
-        .insert({
-          user_id: userId,
-          post_id: postId
-        });
+      const { error: insertError } = await supabase.from('likes').insert({
+        user_id: userId,
+        post_id: postId
+      });
 
       if (insertError) {
         console.error('like insert error', insertError);
