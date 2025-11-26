@@ -48,6 +48,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // =============================
 // Passport (Google OAuth)
 // =============================
+
 passport.use(
   new GoogleStrategy(
     {
@@ -65,12 +66,10 @@ passport.use(
           .single();
 
         if (error && error.code !== 'PGRST116') {
-          // 予期せぬエラー
           return done(error);
         }
 
         if (!user) {
-          // 新規ユーザー作成
           const email =
             profile.emails && profile.emails[0]
               ? profile.emails[0].value
@@ -80,15 +79,18 @@ passport.use(
             profile.displayName ||
             (email ? email.split('@')[0] : `user_${Date.now()}`);
 
-          // handle は "@xxx" 形式、20文字制限
-          let handle = '@' + baseName.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+          // username / handle は 20 文字制限
+          let username = baseName.slice(0, 20);
+
+          let handle =
+            '@' + baseName.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
           if (handle.length > 20) handle = handle.slice(0, 20);
 
           const { data: inserted, error: insertError } = await supabase
             .from('users')
             .insert({
               google_id: profile.id,
-              username: baseName.slice(0, 20), // 念のため 20 文字制限
+              username,
               email,
               handle
             })
@@ -108,7 +110,7 @@ passport.use(
 );
 
 passport.serializeUser((user, done) => {
-  done(null, user.id); // users.id (uuid)
+  done(null, user.id);
 });
 
 passport.deserializeUser(async (id, done) => {
@@ -121,7 +123,9 @@ passport.deserializeUser(async (id, done) => {
   done(null, user);
 });
 
-// ログインチェック用ミドルウェア
+// =============================
+// 共通ヘルパー
+// =============================
 function ensureAuthenticated(req, res, next) {
   if (req.user) return next();
   return res.redirect('/login-modal');
@@ -142,13 +146,13 @@ app.get(
 // ログイン / サインアップ画面
 // =============================
 
-// ログインモーダル（背景暗く・×でホームへ）
+// ログインモーダル（背景はホーム風＋暗くしてカード表示）
 app.get('/login-modal', async (req, res) => {
-  // ホームの投稿も読み込んで、背景にうっすら出すイメージ（簡易版）
   const { data: postsData } = await supabase
     .from('posts')
     .select('id, user_id, type, text, time, parent_post_id, users(username, handle)')
-    .order('time', { ascending: false });
+    .order('time', { ascending: false })
+    .limit(10);
 
   const posts = postsData || [];
 
@@ -163,7 +167,7 @@ app.get('/login-modal', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen relative">
 
-  <!-- 背景としてホーム（簡略版） -->
+  <!-- 背景としてホーム風の簡略リスト -->
   <div class="pointer-events-none opacity-40">
     <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
       <h1 class="text-3xl font-bold text-indigo-600 mb-6">sententia</h1>
@@ -171,35 +175,37 @@ app.get('/login-modal', async (req, res) => {
         ${posts
           .map(
             (p) => `
-          <div class="bg-white rounded-2xl p-4 shadow-sm">
-            <div class="flex items-start gap-3">
-              <div class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
-                <span class="text-xl">👤</span>
-              </div>
-              <div class="flex-1">
-                <div class="flex items-center justify-between">
-                  <div>
-                    <div class="text-sm font-semibold">${p.users?.username || 'ユーザー'}</div>
-                    <div class="text-xs text-gray-500">${p.users?.handle || '@user'}</div>
-                  </div>
-                  <div class="flex items-center gap-2 text-xs text-gray-500">
-                    <span class="px-2 py-0.5 rounded-full text-xs font-medium ${
-                      p.type === 'company'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-purple-100 text-purple-700'
-                    }">
-                      ${p.type === 'company' ? '企業' : '物事'}
-                    </span>
-                    <span>${new Date(p.time).toLocaleString('ja-JP', {
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}</span>
-                  </div>
+        <div class="bg-white rounded-2xl p-4 shadow-sm">
+          <div class="flex items-start gap-3">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
+              <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
+              </svg>
+            </div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-sm font-semibold">${p.users?.username || 'ユーザー'}</div>
+                  <div class="text-xs text-gray-500">${p.users?.handle || '@user'}</div>
                 </div>
-                <p class="mt-2 text-sm break-words">${p.text}</p>
+                <div class="flex items-center gap-2 text-xs text-gray-500">
+                  <span class="px-2 py-0.5 rounded-full text-xs font-medium ${
+                    p.type === 'company'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-purple-100 text-purple-700'
+                  }">
+                    ${p.type === 'company' ? '企業' : '物事'}
+                  </span>
+                  <span>${new Date(p.time).toLocaleString('ja-JP', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}</span>
+                </div>
               </div>
+              <p class="mt-2 text-sm break-words">${p.text}</p>
             </div>
           </div>
+        </div>
         `
           )
           .join('')}
@@ -217,7 +223,6 @@ app.get('/login-modal', async (req, res) => {
               class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
       <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
 
-      <!-- ユーザー名＋パスワードのログイン（必要ならここに後で実装） -->
       <form action="/login" method="POST" class="mb-4">
         <input type="text" name="username" placeholder="ユーザー名"
                maxlength="20"
@@ -248,7 +253,7 @@ app.get('/login-modal', async (req, res) => {
   `);
 });
 
-// サインアップ画面
+// サインアップ画面（利用規約/プライバシーポリシーモーダル付き）
 app.get('/signup', (req, res) => {
   res.send(`
 <!DOCTYPE html>
@@ -259,38 +264,88 @@ app.get('/signup', (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
-  <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
+  <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative z-10">
     <button onclick="location.href='/'"
             class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
     <h2 class="text-2xl font-bold text-center mb-6">アカウントを作成</h2>
     <form action="/signup" method="POST">
-      <input type="text" name="username" placeholder="ユーザー名"
+      <input type="text" name="username" placeholder="ユーザー名（20文字まで）"
              maxlength="20"
              required
              class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
       <input type="password" name="password" placeholder="パスワード"
              required
              class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
-      <input type="text" name="handle" placeholder="@ユーザーID（任意）"
+      <input type="text" name="handle" placeholder="@ユーザーID（任意、20文字まで）"
              maxlength="20"
-             class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-6 focus:outline-none focus:border-blue-500">
+             class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+
+      <div class="text-xs text-gray-600 mb-6">
+        登録することで
+        <button type="button" onclick="openModal('tos-modal')" class="text-blue-500 underline">利用規約</button>
+        と
+        <button type="button" onclick="openModal('privacy-modal')" class="text-blue-500 underline">プライバシーポリシー</button>
+        に同意したものとみなされます。
+      </div>
+
       <button type="submit"
               class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
         作成する
       </button>
     </form>
+
     <p class="text-center text-gray-500 mt-4 cursor-pointer hover:text-blue-500"
        onclick="location.href='/login-modal'">
       すでにアカウントをお持ちですか？ Log in
     </p>
   </div>
+
+  <!-- 利用規約モーダル -->
+  <div id="tos-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-6 relative">
+      <button onclick="closeModal('tos-modal')"
+              class="absolute top-3 right-4 text-gray-400 hover:text-gray-600 text-2xl">×</button>
+      <h3 class="text-xl font-bold mb-4">利用規約</h3>
+      <div class="max-h-80 overflow-y-auto text-sm text-gray-700 space-y-2">
+        <p>本サービス「sententia」は、ユーザーの意見やアイデアを共有するためのプラットフォームです。</p>
+        <p>ユーザーは、法令および公序良俗に反する内容を投稿してはなりません。</p>
+        <p>運営は、不適切と判断した投稿を削除する場合があります。</p>
+        <p>本サービスは予告なく内容の変更、一時停止、終了を行うことがあります。</p>
+        <p>詳細な規約内容は将来アップデートされる可能性があります。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- プライバシーポリシーモーダル -->
+  <div id="privacy-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-6 relative">
+      <button onclick="closeModal('privacy-modal')"
+              class="absolute top-3 right-4 text-gray-400 hover:text-gray-600 text-2xl">×</button>
+      <h3 class="text-xl font-bold mb-4">プライバシーポリシー</h3>
+      <div class="max-h-80 overflow-y-auto text-sm text-gray-700 space-y-2">
+        <p>本サービスは、ユーザー登録やログインに必要な最小限の情報のみを取得します。</p>
+        <p>取得した情報は、認証、サービス改善、セキュリティ確保の目的のみに利用します。</p>
+        <p>本人の同意なく第三者に個人情報を提供することはありません（法令に基づく場合を除く）。</p>
+        <p>アクセスログ等は、統計的な分析に用いることがありますが、個人を特定することはありません。</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+  </script>
 </body>
 </html>
   `);
 });
 
-// サインアップ処理（ローカルアカウント）
+// サインアップ処理
 app.post('/signup', async (req, res) => {
   try {
     const { username, password, handle } = req.body;
@@ -373,7 +428,7 @@ app.post('/login', async (req, res) => {
 });
 
 // =============================
-// 設定画面（ユーザー名/ID変更）
+// 設定（機能7）
 // =============================
 app.get('/settings', ensureAuthenticated, (req, res) => {
   const user = req.user;
@@ -388,10 +443,16 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <!-- 左上タイトル（クリックでホームに戻る） -->
-  <div class="fixed top-6 left-6 z-40">
+  <!-- 左上タイトル + プロフィールアイコン -->
+  <div class="fixed top-6 left-6 z-40 flex items-center gap-3">
     <button onclick="location.href='/'" class="text-3xl font-bold text-indigo-600">
       sententia
+    </button>
+    <button onclick="location.href='/me'"
+            class="w-9 h-9 rounded-full flex items-center justify-center bg-blue-100">
+      <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-500" fill="currentColor">
+        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
+      </svg>
     </button>
   </div>
 
@@ -412,7 +473,6 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
   <div class="max-w-xl mx-auto pt-28 pb-16 px-4">
     <h1 class="text-2xl font-bold mb-6">設定</h1>
 
-    <!-- ユーザー情報セクション -->
     <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
       <button onclick="document.getElementById('user-info-form').classList.toggle('hidden')"
               class="w-full flex items-center justify-between text-left">
@@ -478,7 +538,6 @@ app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
     );
   }
 
-  // セッションのユーザー情報を更新したいので再取得
   const { data: updatedUser } = await supabase
     .from('users')
     .select('*')
@@ -491,19 +550,306 @@ app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
 });
 
 // =============================
+// プロフィール（簡易版：自分 & 他人）
+// =============================
+
+// 自分のプロフィール
+app.get('/me', ensureAuthenticated, (req, res) => {
+  res.redirect('/profile/' + req.user.id);
+});
+
+// プロフィールページ
+app.get('/profile/:id', async (req, res) => {
+  const profileUserId = req.params.id;
+  const viewer = req.user;
+
+  // プロフィールユーザー取得
+  const { data: profileUser, error: userError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', profileUserId)
+    .single();
+
+  if (userError || !profileUser) {
+    return res.send('<h1>ユーザーが見つかりませんでした。</h1>');
+  }
+
+  // そのユーザーの投稿
+  const { data: postsData } = await supabase
+    .from('posts')
+    .select('id, user_id, type, text, time, parent_post_id, users(username, handle)')
+    .eq('user_id', profileUserId)
+    .order('time', { ascending: false });
+
+  const userPosts = postsData || [];
+
+  // そのユーザーが「いいね」した投稿
+  let likedPosts = [];
+  const { data: likesData } = await supabase
+    .from('likes')
+    .select('post_id')
+    .eq('user_id', profileUserId);
+
+  if (likesData && likesData.length > 0) {
+    const postIds = likesData.map((l) => l.post_id);
+    const { data: likedData } = await supabase
+      .from('posts')
+      .select('id, user_id, type, text, time, parent_post_id, users(username, handle)')
+      .in('id', postIds)
+      .order('time', { ascending: false });
+
+    likedPosts = likedData || [];
+  }
+
+  // いいねマップ（このページ表示用）
+  const allPosts = [...userPosts, ...likedPosts];
+  let likesMap = {};
+  if (allPosts.length > 0) {
+    const ids = [...new Set(allPosts.map((p) => p.id))];
+    const { data: likesForAll } = await supabase
+      .from('likes')
+      .select('post_id, user_id')
+      .in('post_id', ids);
+
+    if (likesForAll) {
+      likesForAll.forEach((like) => {
+        if (!likesMap[like.post_id]) {
+          likesMap[like.post_id] = { count: 0, likedByViewer: false };
+        }
+        likesMap[like.post_id].count++;
+        if (viewer && like.user_id === viewer.id) {
+          likesMap[like.post_id].likedByViewer = true;
+        }
+      });
+    }
+  }
+
+  const isSelf = viewer && viewer.id === profileUserId;
+
+  function renderPostCard(p) {
+    const likeInfo = likesMap[p.id] || { count: 0, likedByViewer: false };
+    const likeIcon = likeInfo.likedByViewer ? '❤️' : '🤍';
+    return `
+      <div class="bg-white rounded-2xl p-4 shadow-md">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
+            <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm font-semibold">${p.users?.username || 'ユーザー'}</div>
+                <div class="text-xs text-gray-500">${p.users?.handle || '@user'}</div>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-gray-500">
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium ${
+                  p.type === 'company'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-purple-100 text-purple-700'
+                }">
+                  ${p.type === 'company' ? '企業' : '物事'}
+                </span>
+                <span>${new Date(p.time).toLocaleString('ja-JP', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</span>
+              </div>
+            </div>
+            <p class="mt-2 text-sm whitespace-pre-wrap break-words">${p.text}</p>
+            <div class="mt-3 flex items-center gap-6 text-sm text-gray-500">
+              <button type="button"
+                      onclick="${
+                        viewer
+                          ? `location.href='/?replyTo=${p.id}'`
+                          : `location.href='/login-modal'`
+                      }"
+                      class="flex items-center gap-1 hover:text-blue-500">
+                💬
+              </button>
+              <button type="button"
+                      onclick="${
+                        viewer
+                          ? `handleLike('${p.id}')`
+                          : `location.href='/login-modal'`
+                      }"
+                      class="flex items-center gap-1 hover:text-pink-500">
+                <span>${likeIcon}</span><span>${likeInfo.count}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  res.send(`
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>${profileUser.username || 'ユーザー'} - プロフィール</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- 左上タイトル + プロフィールアイコン -->
+  <div class="fixed top-6 left-6 z-40 flex items-center gap-3">
+    <button onclick="location.href='/'" class="text-3xl font-bold text-indigo-600">
+      sententia
+    </button>
+    ${
+      viewer
+        ? `
+    <button onclick="location.href='/me'"
+            class="w-9 h-9 rounded-full flex items-center justify-center bg-blue-100">
+      <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-500" fill="currentColor">
+        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
+      </svg>
+    </button>
+    `
+        : ''
+    }
+  </div>
+
+  <!-- 右上 設定 / Log in / Log out -->
+  <div class="fixed top-6 right-6 z-40 flex items-center gap-3">
+    ${
+      viewer
+        ? `
+      <button onclick="location.href='/settings'"
+              class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">
+        ⚙️
+      </button>
+      <form action="/logout" method="POST">
+        <button type="submit"
+                class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
+          Log out
+        </button>
+      </form>
+    `
+        : `
+      <button onclick="location.href='/login-modal'"
+              class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
+        Log in
+      </button>
+    `
+    }
+  </div>
+
+  <div class="max-w-2xl mx-auto pt-28 pb-16 px-4">
+    <!-- プロフィールヘッダー -->
+    <div class="bg-white rounded-2xl shadow-md p-6 mb-6">
+      <div class="flex items-center gap-4">
+        <div class="w-16 h-16 rounded-full flex items-center justify-center bg-blue-100">
+          <svg viewBox="0 0 24 24" class="w-10 h-10 text-blue-500" fill="currentColor">
+            <path d="M12 12c2.8 0 5-2.2 5-5s-2.2-5-5-5-5 2.2-5 5 2.2 5 5 5zm0 2c-3.9 0-7 2.4-7 5.3V21h14v-1.7C19 16.4 15.9 14 12 14z"/>
+          </svg>
+        </div>
+        <div>
+          <div class="text-xl font-bold">${profileUser.username || 'ユーザー'}</div>
+          <div class="text-sm text-gray-500">${profileUser.handle || '@user'}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- タブ -->
+    <div class="flex border-b mb-4">
+      <button id="tab-posts" onclick="showTab('posts')"
+              class="flex-1 py-2 text-center font-semibold border-b-2 border-blue-500">
+        投稿
+      </button>
+      <button id="tab-likes" onclick="showTab('likes')"
+              class="flex-1 py-2 text-center text-gray-500 border-b-2 border-transparent">
+        いいね
+      </button>
+    </div>
+
+    <!-- 投稿一覧 -->
+    <div id="tab-posts-panel" class="space-y-4">
+      ${
+        userPosts.length === 0
+          ? `<p class="text-gray-500 text-sm">まだ投稿がありません。</p>`
+          : userPosts.map((p) => renderPostCard(p)).join('')
+      }
+    </div>
+
+    <!-- いいねした投稿一覧 -->
+    <div id="tab-likes-panel" class="space-y-4 hidden">
+      ${
+        likedPosts.length === 0
+          ? `<p class="text-gray-500 text-sm">まだいいねした投稿がありません。</p>`
+          : likedPosts.map((p) => renderPostCard(p)).join('')
+      }
+    </div>
+  </div>
+
+  <script>
+    function showTab(tab) {
+      const postsBtn = document.getElementById('tab-posts');
+      const likesBtn = document.getElementById('tab-likes');
+      const postsPanel = document.getElementById('tab-posts-panel');
+      const likesPanel = document.getElementById('tab-likes-panel');
+
+      if (tab === 'posts') {
+        postsBtn.classList.add('border-blue-500');
+        postsBtn.classList.remove('text-gray-500');
+        likesBtn.classList.remove('border-blue-500');
+        likesBtn.classList.add('text-gray-500');
+        postsPanel.classList.remove('hidden');
+        likesPanel.classList.add('hidden');
+      } else {
+        likesBtn.classList.add('border-blue-500');
+        likesBtn.classList.remove('text-gray-500');
+        postsBtn.classList.remove('border-blue-500');
+        postsBtn.classList.add('text-gray-500');
+        likesPanel.classList.remove('hidden');
+        postsPanel.classList.add('hidden');
+      }
+    }
+
+    async function handleLike(postId) {
+      try {
+        const res = await fetch('/like/' + postId, { method: 'POST' });
+        if (res.ok) {
+          location.reload();
+        } else {
+          alert('いいね処理に失敗しました。');
+        }
+      } catch (e) {
+        alert('ネットワークエラーが発生しました。');
+      }
+    }
+  </script>
+</body>
+</html>
+  `);
+});
+
+// =============================
 // ホーム + 投稿 / 返信 / いいね
 // =============================
 
 app.get('/', async (req, res) => {
-  // 投稿取得
-  const { data: postsData, error: postsError } = await supabase
+  const user = req.user;
+  const search = (req.query.q || '').trim();
+  const replyTo = req.query.replyTo || '';
+
+  let postsQuery = supabase
     .from('posts')
     .select('id, user_id, type, text, time, parent_post_id, users(username, handle)')
     .order('time', { ascending: false });
 
+  if (search) {
+    postsQuery = postsQuery.ilike('text', `%${search}%`);
+  }
+
+  const { data: postsData, error: postsError } = await postsQuery;
   const posts = postsError || !postsData ? [] : postsData;
 
-  // いいね情報取得
+  // いいね集計
   let likesMap = {};
   if (posts.length > 0) {
     const postIds = posts.map((p) => p.id);
@@ -518,14 +864,14 @@ app.get('/', async (req, res) => {
           likesMap[like.post_id] = { count: 0, likedByUser: false };
         }
         likesMap[like.post_id].count++;
-        if (req.user && like.user_id === req.user.id) {
+        if (user && like.user_id === user.id) {
           likesMap[like.post_id].likedByUser = true;
         }
       });
     }
   }
 
-  // 親投稿と返信を分ける
+  // 親投稿と返信
   const topPosts = posts.filter((p) => !p.parent_post_id);
   const repliesByParent = {};
   posts
@@ -534,8 +880,6 @@ app.get('/', async (req, res) => {
       if (!repliesByParent[p.parent_post_id]) repliesByParent[p.parent_post_id] = [];
       repliesByParent[p.parent_post_id].push(p);
     });
-
-  const user = req.user;
 
   res.send(`
 <!DOCTYPE html>
@@ -548,11 +892,23 @@ app.get('/', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <!-- 左上タイトル（クリックでホーム） -->
-  <div class="fixed top-6 left-6 z-40">
+  <!-- 左上タイトル + プロフィールアイコン -->
+  <div class="fixed top-6 left-6 z-40 flex items-center gap-3">
     <button onclick="location.href='/'" class="text-3xl font-bold text-indigo-600">
       sententia
     </button>
+    ${
+      user
+        ? `
+    <button onclick="location.href='/me'"
+            class="w-9 h-9 rounded-full flex items-center justify-center bg-blue-100">
+      <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-500" fill="currentColor">
+        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
+      </svg>
+    </button>
+    `
+        : ''
+    }
   </div>
 
   <!-- 右上 設定 + Log in / Log out -->
@@ -583,14 +939,17 @@ app.get('/', async (req, res) => {
   <!-- メインコンテンツ -->
   <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
 
-    <!-- 検索ボックス（中身は今は未実装） -->
+    <!-- 検索ボックス -->
     <div class="relative mb-8">
-      <input type="text" placeholder="キーワードで検索"
-             class="w-full pl-12 pr-6 py-4 text-lg rounded-full border border-gray-300 focus:outline-none focus:border-indigo-500">
-      <svg class="absolute left-4 top-5 w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-      </svg>
+      <form action="/" method="GET">
+        <input type="text" name="q" value="${search}"
+               placeholder="キーワードで検索"
+               class="w-full pl-12 pr-6 py-4 text-lg rounded-full border border-gray-300 focus:outline-none focus:border-indigo-500">
+        <svg class="absolute left-4 top-5 w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+      </form>
     </div>
 
     <!-- 最近のトピック -->
@@ -601,23 +960,24 @@ app.get('/', async (req, res) => {
           ? '<p class="text-gray-500">まだ投稿がありません。</p>'
           : topPosts
               .map((p) => {
-                const likeInfo = likesMap[p.id] || { count: 0, likedByUser: false };
+                const likeInfo = likesMap[p.id] || {
+                  count: 0,
+                  likedByUser: false
+                };
                 const likeIcon = likeInfo.likedByUser ? '❤️' : '🤍';
                 const replies = repliesByParent[p.id] || [];
                 return `
         <div class="bg-white rounded-2xl p-4 shadow-md">
-          <!-- 親投稿 -->
           <div class="flex items-start gap-3">
-            <!-- アイコン（X風・水色） -->
-            <div class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
-              <!-- シンプルな人型アイコン -->
+            <!-- アイコン -->
+            <button onclick="location.href='/profile/${p.user_id}'"
+                    class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
               <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
               </svg>
-            </div>
+            </button>
 
             <div class="flex-1">
-              <!-- ヘッダー行 -->
               <div class="flex items-center justify-between">
                 <div>
                   <div class="text-sm font-semibold">${p.users?.username || 'ユーザー'}</div>
@@ -638,10 +998,8 @@ app.get('/', async (req, res) => {
                 </div>
               </div>
 
-              <!-- 本文 -->
               <p class="mt-2 text-sm whitespace-pre-wrap break-words">${p.text}</p>
 
-              <!-- アクション（返信・いいね） -->
               <div class="mt-3 flex items-center gap-6 text-sm text-gray-500">
                 <button type="button"
                         onclick="${
@@ -665,7 +1023,7 @@ app.get('/', async (req, res) => {
             </div>
           </div>
 
-          <!-- 返信一覧（簡易表示） -->
+          <!-- 返信一覧 -->
           ${
             replies.length > 0
               ? `
@@ -674,11 +1032,12 @@ app.get('/', async (req, res) => {
                 .map(
                   (r) => `
                 <div class="flex items-start gap-2">
-                  <div class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50">
+                  <button onclick="location.href='/profile/${r.user_id}'"
+                          class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50">
                     <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-400" fill="currentColor">
                       <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
                     </svg>
-                  </div>
+                  </button>
                   <div class="flex-1">
                     <div class="flex items-center justify-between">
                       <div>
@@ -727,7 +1086,7 @@ app.get('/', async (req, res) => {
               class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
 
       <form action="/post" method="POST">
-        <input type="hidden" name="parent_post_id" id="parent_post_id_input">
+        <input type="hidden" name="parent_post_id" id="parent_post_id_input" value="${replyTo || ''}">
 
         <div class="mb-8">
           <button type="button" onclick="this.nextElementSibling.classList.toggle('hidden')"
@@ -779,6 +1138,14 @@ app.get('/', async (req, res) => {
       document.getElementById('parent_post_id_input').value = '';
     }
 
+    ${
+      replyTo
+        ? "document.addEventListener('DOMContentLoaded', () => openPostModal('" +
+          replyTo +
+          "'));"
+        : ''
+    }
+
     async function handleLike(postId) {
       try {
         const res = await fetch('/like/' + postId, { method: 'POST' });
@@ -805,7 +1172,7 @@ app.post('/logout', (req, res, next) => {
   });
 });
 
-// 投稿 / 返信
+// 投稿 / 返信（文字数制限：1〜200文字）
 app.post('/post', ensureAuthenticated, async (req, res) => {
   const { type, opinion, parent_post_id } = req.body;
 
@@ -847,17 +1214,21 @@ app.post('/like/:postId', ensureAuthenticated, async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // 既にいいねしているか確認
-    const { data: existing, error: selectError } = await supabase
+    let existing = null;
+    const { data, error } = await supabase
       .from('likes')
       .select('id')
       .eq('user_id', userId)
       .eq('post_id', postId)
-      .maybeSingle();
+      .single();
 
-    if (selectError && selectError.code !== 'PGRST116') {
-      console.error('like select error', selectError);
-      return res.status(500).send('error');
+    if (error) {
+      if (error.code !== 'PGRST116') {
+        console.error('like select error', error);
+        return res.status(500).send('error');
+      }
+    } else {
+      existing = data;
     }
 
     if (existing) {
