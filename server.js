@@ -136,121 +136,117 @@ app.get(
 app.get('/login-modal', (req, res) => {
   if (req.user) return res.redirect('/');
 
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="ja">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Login - sententia</title>
-      <script src="https://cdn.tailwindcss.com"></script>
-    </head>
-    <body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
-      <div class="absolute inset-0 z-0">
-        <div class="fixed top-6 left-6 flex items-center gap-4">
-          <h1 class="text-3xl font-bold text-indigo-600 cursor-pointer" onclick="location.href='/'">
-            sententia
-          </h1>
-        </div>
-        <div class="absolute inset-0 bg-black bg-opacity-50"></div>
-      </div>
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - sententia</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
+  <div class="absolute inset-0 z-0">
+    <div class="fixed top-6 left-6 flex items-center gap-4">
+      <h1 class="text-3xl font-bold text-indigo-600 cursor-pointer" onclick="location.href='/'">
+        sententia
+      </h1>
+    </div>
+    <div class="absolute inset-0 bg-black bg-opacity-50"></div>
+  </div>
 
-      <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative z-10">
-        <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
-        <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
+  <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative z-10">
+    <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
+    <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
 
-        <form action="/login" method="POST" class="mb-4">
-          <input
-            type="text"
-            name="username"
-            placeholder="ユーザー名"
-            required
-            class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-3 focus:outline-none focus:border-blue-500"
-          >
-          <input
-            type="password"
-            name="password"
-            placeholder="パスワード"
-            required
-            class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500"
-          >
-          <button
-            type="submit"
-            class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
-            ログイン
-          </button>
-        </form>
+    <form action="/login" method="POST" class="mb-4">
+      <input
+        type="text"
+        name="username"
+        placeholder="ユーザー名"
+        required
+        class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-3 focus:outline-none focus:border-blue-500"
+      >
+      <input
+        type="password"
+        name="password"
+        placeholder="パスワード"
+        required
+        class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500"
+      >
+      <button
+        type="submit"
+        class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
+        ログイン
+      </button>
+    </form>
 
-        <p class="text-center text-gray-500 mb-3">または</p>
+    <p class="text-center text-gray-500 mb-3">または</p>
 
-        <a href="/auth/google"
-           class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600">
-          Googleでログイン
-        </a>
+    <a href="/auth/google"
+       class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600">
+      Googleでログイン
+    </a>
 
-        <p class="text-center text-gray-500 mt-4">
-          アカウントをお持ちでないですか？
-        </p>
-        <a href="/signup"
-           class="w-full block text-center text-blue-500 hover:text-blue-700 mt-1">
-          Sign up
-        </a>
-      </div>
-    </body>
-    </html>
-  `);
+    <p class="text-center text-gray-500 mt-4">
+      アカウントをお持ちでないですか？
+    </p>
+    <a href="/signup"
+       class="w-full block text-center text-blue-500 hover:text-blue-700 mt-1">
+      Sign up
+    </a>
+  </div>
+</body>
+</html>`);
 });
 
 // サインアップ画面
 app.get('/signup', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="ja">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Sign up - sententia</title>
-      <script src="https://cdn.tailwindcss.com"></script>
-    </head>
-    <body class="bg-gray-100 min-h-screen flex items-center justify-center">
-      <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
-        <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
-        <h2 class="text-2xl font-bold text-center mb-6">アカウントを作成</h2>
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign up - sententia</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
+    <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
+    <h2 class="text-2xl font-bold text-center mb-6">アカウントを作成</h2>
 
-        <form action="/signup" method="POST" class="mb-4">
-          <input
-            type="text"
-            name="username"
-            placeholder="ユーザー名"
-            required
-            class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
-          <input
-            type="password"
-            name="password"
-            placeholder="パスワード"
-            required
-            class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
-          <button
-            type="submit"
-            class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
-            作成する
-          </button>
-        </form>
+    <form action="/signup" method="POST" class="mb-4">
+      <input
+        type="text"
+        name="username"
+        placeholder="ユーザー名"
+        required
+        class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+      <input
+        type="password"
+        name="password"
+        placeholder="パスワード"
+        required
+        class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+      <button
+        type="submit"
+        class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
+        作成する
+      </button>
+    </form>
 
-        <p class="text-center text-gray-500 mb-3">または</p>
+    <p class="text-center text-gray-500 mb-3">または</p>
 
-        <a href="/auth/google"
-           class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600">
-          Googleでログイン / 登録
-        </a>
+    <a href="/auth/google"
+       class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600">
+      Googleでログイン / 登録
+    </a>
 
-        <p class="text-center text-gray-500 mt-4 cursor-pointer hover:text-blue-500" onclick="location.href='/login-modal'">
-          すでにアカウントをお持ちですか？ Log in
-        </p>
-      </div>
-    </body>
-    </html>
-  `);
+    <p class="text-center text-gray-500 mt-4 cursor-pointer hover:text-blue-500" onclick="location.href='/login-modal'">
+      すでにアカウントをお持ちですか？ Log in
+    </p>
+  </div>
+</body>
+</html>`);
 });
 
 // ローカルサインアップ
@@ -298,7 +294,7 @@ app.post('/signup', async (req, res) => {
 });
 
 // ローカルログイン
-app.post('/login', async (req, res, next) => {
+app.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -348,182 +344,206 @@ app.post('/login', async (req, res, next) => {
 app.get('/onboarding', (req, res) => {
   if (!req.user) return res.redirect('/login-modal');
 
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="ja">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>プロフィール登録 - sententia</title>
-      <script src="https://cdn.tailwindcss.com"></script>
-    </head>
-    <body class="bg-gray-100 min-h-screen flex items-center justify-center">
-      <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
-        <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
-        <h2 class="text-2xl font-bold text-center mb-6">プロフィールを完成させる</h2>
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>プロフィール登録 - sententia</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
+    <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
+    <h2 class="text-2xl font-bold text-center mb-6">プロフィールを完成させる</h2>
 
-        <form action="/onboarding" method="POST" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium mb-1">生年月日</label>
-            <input type="date" name="birthday"
-              class="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500" required>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium mb-1">性別</label>
-            <select name="gender"
-              class="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500" required>
-              <option value="">選択してください</option>
-              <option value="female">女性</option>
-              <option value="male">男性</option>
-              <option value="other">その他</option>
-              <option value="no_answer">回答しない</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium mb-1">ユーザーID（@から始まる）</label>
-            <input type="text" name="handle" placeholder="@example"
-              class="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500" required>
-          </div>
-
-          <div class="space-y-2 text-sm">
-            <label class="flex items-center gap-2">
-              <input type="checkbox" name="agree_tos" required>
-              <span>
-                <button type="button" onclick="openModal('terms-modal')" class="text-blue-500 underline">
-                  利用規約
-                </button> に同意します
-              </span>
-            </label>
-            <label class="flex items-center gap-2">
-              <input type="checkbox" name="agree_privacy" required>
-              <span>
-                <button type="button" onclick="openModal('privacy-modal')" class="text-blue-500 underline">
-                  プライバシーポリシー
-                </button> に同意します
-              </span>
-            </label>
-          </div>
-
-          <button type="submit"
-            class="w-full mt-4 bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
-            登録する
-          </button>
-        </form>
+    <form action="/onboarding" method="POST" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">生年月日</label>
+        <!-- required を外してブラウザのエラーを消し、サーバー側でチェック -->
+        <input type="date" name="birthday"
+          class="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500">
       </div>
 
-      <!-- 利用規約モーダル -->
-      <div id="terms-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4 p-8 relative max-h-[80vh] overflow-y-auto">
-          <button onclick="closeModal('terms-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
-          <h2 class="text-2xl font-bold mb-4">sententia 利用規約</h2>
-          <p class="text-sm text-gray-500 mb-4">最終更新日: 2025年1月1日（例）</p>
-
-          <h3 class="text-lg font-semibold mt-4 mb-2">第1条（適用）</h3>
-          <p class="mb-3">
-            本規約は、ユーザーが sententia（以下「本サービス」）を利用する際の一切の行為に適用されます。
-            ユーザーは、本サービスを利用することにより、本規約に同意したものとみなされます。
-          </p>
-
-          <h3 class="text-lg font-semibold mt-4 mb-2">第2条（アカウント）</h3>
-          <p class="mb-3">
-            ユーザーは、正確かつ最新の情報をもってアカウントを作成し、その管理責任を負うものとします。
-            アカウント情報の不正利用等が発生した場合でも、本サービス運営者は一切の責任を負いません。
-          </p>
-
-          <h3 class="text-lg font-semibold mt-4 mb-2">第3条（禁止事項）</h3>
-          <ul class="list-disc pl-6 mb-3 space-y-1">
-            <li>法令または公序良俗に反する行為</li>
-            <li>他のユーザーまたは第三者に対する誹謗中傷・嫌がらせ行為</li>
-            <li>本サービスの運営を妨害する行為</li>
-            <li>不正アクセス、なりすまし等の不正行為</li>
-          </ul>
-
-          <h3 class="text-lg font-semibold mt-4 mb-2">第4条（投稿内容の取り扱い）</h3>
-          <p class="mb-3">
-            ユーザーは、自らが投稿した内容について必要な権利を有しているものとし、本サービス運営者に対して、
-            サービスの提供・改善・研究・分析等の目的で投稿内容を利用する非独占的な権利を許諾するものとします。
-          </p>
-
-          <h3 class="text-lg font-semibold mt-4 mb-2">第5条（免責）</h3>
-          <p class="mb-3">
-            本サービスは、提供する情報の正確性・完全性・有用性について保証するものではありません。
-            ユーザーは自己責任において本サービスを利用するものとし、利用により生じたいかなる損害についても、
-            本サービス運営者は責任を負いません。
-          </p>
-
-          <h3 class="text-lg font-semibold mt-4 mb-2">第6条（規約の変更）</h3>
-          <p class="mb-3">
-            本サービス運営者は、必要に応じて本規約を変更することができるものとします。
-            変更後の本規約は、本サービス上に掲示された時点で効力を生じるものとします。
-          </p>
-        </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">性別</label>
+        <select name="gender"
+          class="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500">
+          <option value="">選択してください</option>
+          <option value="female">女性</option>
+          <option value="male">男性</option>
+          <option value="other">その他</option>
+          <option value="no_answer">回答しない</option>
+        </select>
       </div>
 
-      <!-- プライバシーポリシーモーダル -->
-      <div id="privacy-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4 p-8 relative max-h-[80vh] overflow-y-auto">
-          <button onclick="closeModal('privacy-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
-          <h2 class="text-2xl font-bold mb-4">sententia プライバシーポリシー</h2>
-          <p class="text-sm text-gray-500 mb-4">最終更新日: 2025年1月1日（例）</p>
-
-          <h3 class="text-lg font-semibold mt-4 mb-2">第1条（収集する情報）</h3>
-          <p class="mb-3">
-            本サービスは、アカウント登録時にユーザー名、メールアドレス、パスワード、プロフィール情報（生年月日・性別・ユーザーIDなど）を収集します。
-            また、投稿内容やアクセスログ、利用状況等の情報を取得する場合があります。
-          </p>
-
-          <h3 class="text-lg font-semibold mt-4 mb-2">第2条（利用目的）</h3>
-          <ul class="list-disc pl-6 mb-3 space-y-1">
-            <li>本サービスの提供および運営のため</li>
-            <li>不正利用の防止・対策のため</li>
-            <li>サービス品質の向上、新機能の開発のため</li>
-            <li>お問い合わせへの対応のため</li>
-          </ul>
-
-          <h3 class="text-lg font-semibold mt-4 mb-2">第3条（第三者提供）</h3>
-          <p class="mb-3">
-            法令に基づく場合を除き、ユーザーの同意なく個人情報を第三者に提供することはありません。
-          </p>
-
-          <h3 class="text-lg font-semibold mt-4 mb-2">第4条（安全管理）</h3>
-          <p class="mb-3">
-            本サービスは、ユーザー情報への不正アクセス、紛失、改ざん、漏えい等を防止するために、適切な安全管理措置を講じます。
-          </p>
-
-          <h3 class="text-lg font-semibold mt-4 mb-2">第5条（ユーザーによる開示・訂正・削除）</h3>
-          <p class="mb-3">
-            ユーザーは、本サービス所定の方法により、自身の登録情報の閲覧・訂正・削除を行うことができます。
-          </p>
-
-          <h3 class="text-lg font-semibold mt-4 mb-2">第6条（プライバシーポリシーの変更）</h3>
-          <p class="mb-3">
-            本ポリシーの内容は、必要に応じて変更することがあります。
-            変更後の内容は、本サービス上に掲示した時点で効力を生じるものとします。
-          </p>
-        </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">ユーザーID（@から始まる）</label>
+        <input type="text" name="handle" placeholder="@example"
+          class="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500">
       </div>
 
-      <script>
-        function openModal(id) {
-          document.getElementById(id).classList.remove('hidden');
-        }
-        function closeModal(id) {
-          document.getElementById(id).classList.add('hidden');
-        }
-      </script>
-    </body>
-    </html>
-  `);
+      <div class="space-y-2 text-sm">
+        <label class="flex items-center gap-2">
+          <input type="checkbox" name="agree_tos">
+          <span>
+            <button type="button" onclick="openModal('terms-modal')" class="text-blue-500 underline">
+              利用規約
+            </button> に同意します
+          </span>
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="checkbox" name="agree_privacy">
+          <span>
+            <button type="button" onclick="openModal('privacy-modal')" class="text-blue-500 underline">
+              プライバシーポリシー
+            </button> に同意します
+          </span>
+        </label>
+      </div>
+
+      <button type="submit"
+        class="w-full mt-4 bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
+        登録する
+      </button>
+    </form>
+  </div>
+
+  <!-- 利用規約モーダル -->
+  <div id="terms-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4 p-8 relative max-h-[80vh] overflow-y-auto">
+      <button onclick="closeModal('terms-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
+      <h2 class="text-2xl font-bold mb-4">sententia 利用規約</h2>
+      <p class="text-sm text-gray-500 mb-4">最終更新日: 2025年1月1日（例）</p>
+
+      <h3 class="text-lg font-semibold mt-4 mb-2">第1条（適用）</h3>
+      <p class="mb-3">
+        本規約は、ユーザーが sententia（以下「本サービス」）を利用する際の一切の行為に適用されます。
+        ユーザーは、本サービスを利用することにより、本規約に同意したものとみなされます。
+      </p>
+
+      <h3 class="text-lg font-semibold mt-4 mb-2">第2条（アカウント）</h3>
+      <p class="mb-3">
+        ユーザーは、正確かつ最新の情報をもってアカウントを作成し、その管理責任を負うものとします。
+        アカウント情報の不正利用等が発生した場合でも、本サービス運営者は一切の責任を負いません。
+      </p>
+
+      <h3 class="text-lg font-semibold mt-4 mb-2">第3条（禁止事項）</h3>
+      <ul class="list-disc pl-6 mb-3 space-y-1">
+        <li>法令または公序良俗に反する行為</li>
+        <li>他のユーザーまたは第三者に対する誹謗中傷・嫌がらせ行為</li>
+        <li>本サービスの運営を妨害する行為</li>
+        <li>不正アクセス、なりすまし等の不正行為</li>
+      </ul>
+
+      <h3 class="text-lg font-semibold mt-4 mb-2">第4条（投稿内容の取り扱い）</h3>
+      <p class="mb-3">
+        ユーザーは、自らが投稿した内容について必要な権利を有しているものとし、本サービス運営者に対して、
+        サービスの提供・改善・研究・分析等の目的で投稿内容を利用する非独占的な権利を許諾するものとします。
+      </p>
+
+      <h3 class="text-lg font-semibold mt-4 mb-2">第5条（免責）</h3>
+      <p class="mb-3">
+        本サービスは、提供する情報の正確性・完全性・有用性について保証するものではありません。
+        ユーザーは自己責任において本サービスを利用するものとし、利用により生じたいかなる損害についても、
+        本サービス運営者は責任を負いません。
+      </p>
+
+      <h3 class="text-lg font-semibold mt-4 mb-2">第6条（規約の変更）</h3>
+      <p class="mb-3">
+        本サービス運営者は、必要に応じて本規約を変更することができるものとします。
+        変更後の本規約は、本サービス上に掲示された時点で効力を生じるものとします。
+      </p>
+    </div>
+  </div>
+
+  <!-- プライバシーポリシーモーダル -->
+  <div id="privacy-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-2xl mx-4 p-8 relative max-h-[80vh] overflow-y-auto">
+      <button onclick="closeModal('privacy-modal')" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
+      <h2 class="text-2xl font-bold mb-4">sententia プライバシーポリシー</h2>
+      <p class="text-sm text-gray-500 mb-4">最終更新日: 2025年1月1日（例）</p>
+
+      <h3 class="text-lg font-semibold mt-4 mb-2">第1条（収集する情報）</h3>
+      <p class="mb-3">
+        本サービスは、アカウント登録時にユーザー名、メールアドレス、パスワード、プロフィール情報（生年月日・性別・ユーザーIDなど）を収集します。
+        また、投稿内容やアクセスログ、利用状況等の情報を取得する場合があります。
+      </p>
+
+      <h3 class="text-lg font-semibold mt-4 mb-2">第2条（利用目的）</h3>
+      <ul class="list-disc pl-6 mb-3 space-y-1">
+        <li>本サービスの提供および運営のため</li>
+        <li>不正利用の防止・対策のため</li>
+        <li>サービス品質の向上、新機能の開発のため</li>
+        <li>お問い合わせへの対応のため</li>
+      </ul>
+
+      <h3 class="text-lg font-semibold mt-4 mb-2">第3条（第三者提供）</h3>
+      <p class="mb-3">
+        法令に基づく場合を除き、ユーザーの同意なく個人情報を第三者に提供することはありません。
+      </p>
+
+      <h3 class="text-lg font-semibold mt-4 mb-2">第4条（安全管理）</h3>
+      <p class="mb-3">
+        本サービスは、ユーザー情報への不正アクセス、紛失、改ざん、漏えい等を防止するために、適切な安全管理措置を講じます。
+      </p>
+
+      <h3 class="text-lg font-semibold mt-4 mb-2">第5条（ユーザーによる開示・訂正・削除）</h3>
+      <p class="mb-3">
+        ユーザーは、本サービス所定の方法により、自身の登録情報の閲覧・訂正・削除を行うことができます。
+      </p>
+
+      <h3 class="text-lg font-semibold mt-4 mb-2">第6条（プライバシーポリシーの変更）</h3>
+      <p class="mb-3">
+        本ポリシーの内容は、必要に応じて変更することがあります。
+        変更後の内容は、本サービス上に掲示した時点で効力を生じるものとします。
+      </p>
+    </div>
+  </div>
+
+  <script>
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+  </script>
+</body>
+</html>`);
 });
 
-// オンボーディング POST
+// オンボーディング POST（生年月日などサーバー側バリデーション）
 app.post('/onboarding', async (req, res) => {
   if (!req.user) return res.redirect('/login-modal');
 
   try {
     let { birthday, gender, handle, agree_tos, agree_privacy } = req.body;
+
+    if (!birthday) {
+      return res.send(`
+        <script>
+          alert("生年月日を入力してください");
+          history.back();
+        </script>
+      `);
+    }
+    if (!gender) {
+      return res.send(`
+        <script>
+          alert("性別を選択してください");
+          history.back();
+        </script>
+      `);
+    }
+    if (!handle || !handle.trim()) {
+      return res.send(`
+        <script>
+          alert("ユーザーID（@）を入力してください");
+          history.back();
+        </script>
+      `);
+    }
 
     handle = handle.trim();
     if (!handle.startsWith('@')) {
@@ -588,7 +608,7 @@ app.post('/onboarding', async (req, res) => {
 app.get('/profile', async (req, res) => {
   if (!req.user) return res.redirect('/login-modal');
 
-  const { data: postsData, error } = await supabase
+  const { data: postsData } = await supabase
     .from('posts')
     .select('*, users(username)')
     .eq('user_id', req.user.id)
@@ -596,8 +616,7 @@ app.get('/profile', async (req, res) => {
 
   const posts = postsData || [];
 
-  res.send(`
-<!DOCTYPE html>
+  res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -607,14 +626,25 @@ app.get('/profile', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <!-- ヘッダー -->
+  <!-- 左上タイトル -->
   <div class="fixed top-6 left-6 z-40 flex items-center gap-4">
     <h1 class="text-3xl font-bold text-indigo-600 cursor-pointer" onclick="location.href='/'">
       sententia
     </h1>
   </div>
 
+  <!-- 右上 設定アイコン + Log out -->
   <form id="logout-form" action="/logout" method="POST" style="display:none;"></form>
+
+  <button
+    onclick="location.href='/settings';"
+    class="fixed top-6 right-20 bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-full font-medium z-40 hover:bg-gray-50 flex items-center justify-center shadow-sm">
+    <!-- 歯車アイコン -->
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M11.983 1.904a1 1 0 00-1.966 0l-.264 1.325a5.52 5.52 0 00-1.518.878l-1.28-.513a1 1 0 00-1.316.59L3.66 6.362a1 1 0 00.228 1.024l.94.94a5.52 5.52 0 000 1.748l-.94.94a1 1 0 00-.228 1.024l.98 2.178a1 1 0 001.316.59l1.28-.513c.46.37.968.673 1.518.878l.264 1.325a1 1 0 001.966 0l.264-1.325a5.52 5.52 0 001.518-.878l1.28.513a1 1 0 001.316-.59l.98-2.178a1 1 0 00-.228-1.024l-.94-.94a5.52 5.52 0 000-1.748l.94-.94a1 1 0 00.228-1.024l-.98-2.178a1 1 0 00-1.316-.59l-1.28.513a5.52 5.52 0 00-1.518-.878l-.264-1.325zM10 8a2 2 0 110 4 2 2 0 010-4z" />
+    </svg>
+  </button>
+
   <button
     onclick="document.getElementById('logout-form').submit();"
     class="fixed top-6 right-6 bg-black text-white px-6 py-2 rounded-lg font-medium z-40 hover:bg-gray-800">
@@ -682,8 +712,177 @@ app.get('/profile', async (req, res) => {
   </div>
 
 </body>
-</html>
-  `);
+</html>`);
+});
+
+// 設定画面（ユーザー情報メニュー → ユーザー名/ID変更）
+app.get('/settings', (req, res) => {
+  if (!req.user) return res.redirect('/login-modal');
+
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>設定 - sententia</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- 左上タイトル -->
+  <div class="fixed top-6 left-6 z-40 flex items-center gap-4">
+    <h1 class="text-3xl font-bold text-indigo-600 cursor-pointer" onclick="location.href='/'">
+      sententia
+    </h1>
+  </div>
+
+  <!-- 右上 設定アイコン + Log out -->
+  <form id="logout-form" action="/logout" method="POST" style="display:none;"></form>
+
+  <button
+    onclick="location.href='/settings';"
+    class="fixed top-6 right-20 bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-full font-medium z-40 hover:bg-gray-50 flex items-center justify-center shadow-sm">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M11.983 1.904a1 1 0 00-1.966 0l-.264 1.325a5.52 5.52 0 00-1.518.878l-1.28-.513a1 1 0 00-1.316.59L3.66 6.362a1 1 0 00.228 1.024l.94.94a5.52 5.52 0 000 1.748l-.94.94a1 1 0 00-.228 1.024l.98 2.178a1 1 0 001.316.59l1.28-.513c.46.37.968.673 1.518.878l.264 1.325a1 1 0 001.966 0l.264-1.325a5.52 5.52 0 001.518-.878l1.28.513a1 1 0 001.316-.59l.98-2.178a1 1 0 00-.228-1.024l-.94-.94a5.52 5.52 0 000-1.748l.94-.94a1 1 0 00.228-1.024l-.98-2.178a1 1 0 00-1.316-.59l-1.28.513a5.52 5.52 0 00-1.518-.878l-.264-1.325zM10 8a2 2 0 110 4 2 2 0 010-4z" />
+    </svg>
+  </button>
+
+  <button
+    onclick="document.getElementById('logout-form').submit();"
+    class="fixed top-6 right-6 bg-black text-white px-6 py-2 rounded-lg font-medium z-40 hover:bg-gray-800">
+    Log out
+  </button>
+
+  <!-- メイン -->
+  <div class="max-w-2xl mx-auto pt-24 pb-24 px-4">
+    <div class="bg-white rounded-3xl shadow-md p-6 mb-6">
+      <h2 class="text-2xl font-bold mb-4">設定</h2>
+
+      <!-- 設定項目：今はユーザー情報だけ -->
+      <div class="space-y-3">
+        <button
+          type="button"
+          onclick="document.getElementById('user-info-panel').classList.remove('hidden')"
+          class="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-gray-200 hover:bg-gray-50">
+          <span class="font-medium">ユーザー情報</span>
+          <span class="text-gray-400">&gt;</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ユーザー情報編集パネル -->
+    <div id="user-info-panel" class="bg-white rounded-3xl shadow-md p-6 hidden">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-bold">ユーザー情報</h3>
+        <button
+          type="button"
+          onclick="document.getElementById('user-info-panel').classList.add('hidden')"
+          class="text-gray-400 hover:text-gray-600 text-2xl leading-none">
+          ×
+        </button>
+      </div>
+
+      <form action="/settings/user" method="POST" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">ユーザー名</label>
+          <input
+            type="text"
+            name="username"
+            value="${req.user.username || ''}"
+            class="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500"
+            required
+          >
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">ユーザーID（@から始まる）</label>
+          <input
+            type="text"
+            name="handle"
+            value="${req.user.handle || ''}"
+            class="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500"
+            required
+          >
+        </div>
+
+        <button
+          type="submit"
+          class="w-full mt-2 bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
+          保存する
+        </button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>`);
+});
+
+// ユーザー情報更新（ユーザー名・ID）
+app.post('/settings/user', async (req, res) => {
+  if (!req.user) return res.redirect('/login-modal');
+
+  try {
+    let { username, handle } = req.body;
+
+    if (!username || !username.trim()) {
+      return res.send(`
+        <script>
+          alert("ユーザー名を入力してください");
+          history.back();
+        </script>
+      `);
+    }
+    if (!handle || !handle.trim()) {
+      return res.send(`
+        <script>
+          alert("ユーザーID（@）を入力してください");
+          history.back();
+        </script>
+      `);
+    }
+
+    username = username.trim();
+    handle = handle.trim();
+    if (!handle.startsWith('@')) handle = '@' + handle;
+
+    const { error } = await supabase
+      .from('users')
+      .update({ username, handle })
+      .eq('id', req.user.id);
+
+    if (error) {
+      console.error('Update user info error:', error);
+      if (error.code === '23505') {
+        return res.send(`
+          <script>
+            alert("そのユーザー名またはユーザーID（@）はすでに使われています。別のものを入力してください。");
+            history.back();
+          </script>
+        `);
+      }
+      return res.send(`
+        <script>
+          alert("ユーザー情報の更新中にエラーが発生しました: ${error.message}");
+          history.back();
+        </script>
+      `);
+    }
+
+    return res.send(`
+      <script>
+        alert("ユーザー情報を更新しました");
+        location.href = '/settings';
+      </script>
+    `);
+  } catch (e) {
+    console.error('POST /settings/user error:', e);
+    return res.send(`
+      <script>
+        alert("ユーザー情報の更新中にサーバーエラーが発生しました");
+        history.back();
+      </script>
+    `);
+  }
 });
 
 // ホーム（検索付き・未ログインでも閲覧可）
@@ -708,8 +907,7 @@ app.get('/', async (req, res) => {
   const posts = postsData || [];
   const isLoggedIn = !!req.user;
 
-  res.send(`
-<!DOCTYPE html>
+  res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -741,7 +939,21 @@ app.get('/', async (req, res) => {
     </button>
   </div>
 
+  <!-- 右上 設定アイコン + Log in/out -->
   <form id="logout-form" action="/logout" method="POST" style="display:none;"></form>
+
+  <button
+    onclick="${
+      isLoggedIn
+        ? "location.href='/settings';"
+        : "location.href='/login-modal';"
+    }"
+    class="fixed top-6 right-20 bg-white border border-gray-300 text-gray-700 px-3 py-2 rounded-full font-medium z-40 hover:bg-gray-50 flex items-center justify-center shadow-sm">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+      <path d="M11.983 1.904a1 1 0 00-1.966 0l-.264 1.325a5.52 5.52 0 00-1.518.878l-1.28-.513a1 1 0 00-1.316.59L3.66 6.362a1 1 0 00.228 1.024l.94.94a5.52 5.52 0 000 1.748l-.94.94a1 1 0 00-.228 1.024l.98 2.178a1 1 0 001.316.59l1.28-.513c.46.37.968.673 1.518.878l.264 1.325a1 1 0 001.966 0l.264-1.325a5.52 5.52 0 001.518-.878l1.28.513a1 1 0 001.316-.59l.98-2.178a1 1 0 00-.228-1.024l-.94-.94a5.52 5.52 0 000-1.748l.94-.94a1 1 0 00.228-1.024l-.98-2.178a1 1 0 00-1.316-.59l-1.28.513a5.52 5.52 0 00-1.518-.878l-.264-1.325zM10 8a2 2 0 110 4 2 2 0 010-4z" />
+    </svg>
+  </button>
+
   <button
     onclick="${
       isLoggedIn
@@ -811,6 +1023,7 @@ app.get('/', async (req, res) => {
     </div>
   </div>
 
+  <!-- 投稿ボタン -->
   <button
     onclick="${
       isLoggedIn
@@ -821,6 +1034,7 @@ app.get('/', async (req, res) => {
     投稿する
   </button>
 
+  <!-- 投稿モーダル -->
   <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
       <button onclick="document.getElementById('modal').classList.add('hidden')"
@@ -857,8 +1071,7 @@ app.get('/', async (req, res) => {
   </div>
 
 </body>
-</html>
-  `);
+</html>`);
 });
 
 // ログアウト
@@ -872,7 +1085,7 @@ app.post('/logout', (req, res, next) => {
 // 投稿エンドポイント（ログイン必須）
 app.post('/post', async (req, res) => {
   if (!req.user) return res.redirect('/login-modal');
-  const { data, error } = await supabase.from('posts').insert({
+  const { error } = await supabase.from('posts').insert({
     user_id: req.user.id,
     type: req.body.type || 'company',
     text: req.body.opinion
