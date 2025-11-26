@@ -1215,38 +1215,36 @@ app.post('/like/:postId', ensureAuthenticated, async (req, res) => {
   const userId = req.user.id;
 
   try {
-    let existing = null;
-    const { data, error } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('likes')
       .select('id')
       .eq('user_id', userId)
       .eq('post_id', postId)
-      .single();
+      .maybeSingle();
 
-    if (error) {
-      if (error.code !== 'PGRST116') {
-        console.error('like select error', error);
-        return res.status(500).send('error');
-      }
-    } else {
-      existing = data;
+    if (existingError) {
+      console.error('like select error', existingError);
+      return res.status(500).send('error');
     }
 
     if (existing) {
-      // いいね解除
       const { error: deleteError } = await supabase
         .from('likes')
         .delete()
         .eq('id', existing.id);
+
       if (deleteError) {
         console.error('like delete error', deleteError);
         return res.status(500).send('error');
       }
     } else {
-      // いいね追加
       const { error: insertError } = await supabase
         .from('likes')
-        .insert({ user_id: userId, post_id: postId });
+        .insert({
+          user_id: userId,
+          post_id: postId
+        });
+
       if (insertError) {
         console.error('like insert error', insertError);
         return res.status(500).send('error');
