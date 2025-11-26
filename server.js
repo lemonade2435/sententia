@@ -387,7 +387,7 @@ if (!username || username.length < 1 || username.length > 20) {
 
     if (error) {
       return res.send(
-        \`<script>alert("サインアップエラー: \${error.message}"); history.back();</script>\`
+        '<script>alert("サインアップエラー: \${error.message}"); history.back();</script>'
       );
     }
 
@@ -536,7 +536,7 @@ app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
 
   if (error) {
     return res.send(
-      `<script>alert("更新エラー: ${error.message}"); history.back();</script>`
+      '<script>alert("更新エラー: ${error.message}"); history.back();</script>'
     );
   }
 
