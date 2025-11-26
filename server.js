@@ -358,11 +358,9 @@ app.post('/signup', async (req, res) => {
   try {
     const { username, password, handle } = req.body;
 
-    if (!username || username.length > 20) {
-      return res.send(
-        \`<script>alert("ユーザー名は1〜20文字で入力してください。"); history.back();</script>\`
-      );
-    }
+if (!username || username.length < 1 || username.length > 20) {
+  return res.send('<script>alert("ユーザー名は1〜20文字で入力してください。"); history.back();</script>');
+}
 
     let finalHandle = handle?.trim();
     if (finalHandle) {
