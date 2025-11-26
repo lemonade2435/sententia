@@ -1,6 +1,6 @@
 const express = require('express');
 const session = require('express-session');
-const { default: RedisStore } = require('connect-redis'); // connect-redis v7 用
+const { default: RedisStore } = require('connect-redis');
 const Redis = require('ioredis');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
@@ -11,13 +11,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 必要に応じてプロキシを信頼（Render などのリバースプロキシ環境用）
+// Render 等のプロキシ環境だとセッション維持に必要
 app.set('trust proxy', 1);
 
 // Redisクライアント
 const redisClient = new Redis(process.env.UPSTASH_REDIS_URL);
 
-// セッション設定（Redisストアで永続化）
+// セッション設定
 const redisStore = new RedisStore({
   client: redisClient,
   prefix: 'sententia:'
@@ -30,8 +30,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      // デバッグ優先のため一旦 false に固定（HTTPS 本番では true 推奨）
-      secure: false,
+      secure: false, // デバッグ優先。https 本番では true にする
       httpOnly: true,
       sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000
@@ -46,6 +45,18 @@ app.use(passport.session());
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// プロフィール完成チェック用ヘルパー
+function needsOnboarding(user) {
+  if (!user) return true;
+  return !(
+    user.birthday &&
+    user.gender &&
+    user.handle &&
+    user.tos_agreed_at &&
+    user.privacy_agreed_at
+  );
+}
 
 // Google OAuth設定
 passport.use(
@@ -97,7 +108,6 @@ passport.deserializeUser(async (id, done) => {
       .select('*')
       .eq('id', id)
       .single();
-
     if (error) return done(error);
     return done(null, user);
   } catch (e) {
@@ -114,10 +124,16 @@ app.get(
 app.get(
   '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/login-modal' }),
-  (req, res) => res.redirect('/')
+  (req, res) => {
+    // Googleログイン後もプロフィールチェック
+    if (needsOnboarding(req.user)) {
+      return res.redirect('/onboarding');
+    }
+    return res.redirect('/');
+  }
 );
 
-// ログイン画面（フォーム + Googleボタン / 背景暗く / ×でホームへ）
+// ログイン画面
 app.get('/login-modal', (req, res) => {
   if (req.user) return res.redirect('/');
 
@@ -131,7 +147,6 @@ app.get('/login-modal', (req, res) => {
       <script src="https://cdn.tailwindcss.com"></script>
     </head>
     <body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
-      <!-- 背景（ホームの上に半透明オーバーレイが乗っているイメージ） -->
       <div class="absolute inset-0 z-0">
         <div class="fixed top-6 left-6">
           <h1 class="text-3xl font-bold text-indigo-600">sententia</h1>
@@ -139,12 +154,10 @@ app.get('/login-modal', (req, res) => {
         <div class="absolute inset-0 bg-black bg-opacity-50"></div>
       </div>
 
-      <!-- ログインカード本体 -->
       <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative z-10">
         <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
         <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
 
-        <!-- ローカルログインフォーム -->
         <form action="/login" method="POST" class="mb-4">
           <input
             type="text"
@@ -169,7 +182,6 @@ app.get('/login-modal', (req, res) => {
 
         <p class="text-center text-gray-500 mb-3">または</p>
 
-        <!-- Google ログインボタン -->
         <a href="/auth/google"
            class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600">
           Googleでログイン
@@ -188,7 +200,7 @@ app.get('/login-modal', (req, res) => {
   `);
 });
 
-// サインアップページ
+// サインアップ画面
 app.get('/signup', (req, res) => {
   res.send(`
     <!DOCTYPE html>
@@ -204,7 +216,6 @@ app.get('/signup', (req, res) => {
         <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
         <h2 class="text-2xl font-bold text-center mb-6">アカウントを作成</h2>
 
-        <!-- ローカルサインアップフォーム -->
         <form action="/signup" method="POST" class="mb-4">
           <input
             type="text"
@@ -227,7 +238,6 @@ app.get('/signup', (req, res) => {
 
         <p class="text-center text-gray-500 mb-3">または</p>
 
-        <!-- Google ログイン/登録ボタン -->
         <a href="/auth/google"
            class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600">
           Googleでログイン / 登録
@@ -246,7 +256,6 @@ app.get('/signup', (req, res) => {
 app.post('/signup', async (req, res) => {
   try {
     const { username, password } = req.body;
-
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const { data, error } = await supabase
@@ -275,6 +284,7 @@ app.post('/signup', async (req, res) => {
       `);
     }
 
+    // 作成後は通常のログイン画面へ
     return res.redirect('/login-modal');
   } catch (e) {
     console.error('POST /signup error:', e);
@@ -287,14 +297,14 @@ app.post('/signup', async (req, res) => {
   }
 });
 
-// ローカルログイン（sign in）
+// ローカルログイン
 app.post('/login', async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, username, password')
+      .select('id, username, password, birthday, gender, handle, tos_agreed_at, privacy_agreed_at')
       .eq('username', username)
       .single();
 
@@ -318,8 +328,10 @@ app.post('/login', async (req, res, next) => {
           '<script>alert("ログイン中にエラーが発生しました"); history.back();</script>'
         );
       }
-      // ここでセッションが作られ、次のリクエストから req.user が使える
-      console.log('LOGIN SUCCESS:', user.id, user.username);
+
+      if (needsOnboarding(user)) {
+        return res.redirect('/onboarding');
+      }
       return res.redirect('/');
     });
   } catch (e) {
@@ -327,6 +339,137 @@ app.post('/login', async (req, res, next) => {
     return res.send(
       '<script>alert("サーバーエラーが発生しました"); history.back();</script>'
     );
+  }
+});
+
+// 追加情報登録画面（オンボーディング）
+app.get('/onboarding', (req, res) => {
+  if (!req.user) return res.redirect('/login-modal');
+
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>プロフィール登録 - sententia</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-gray-100 min-h-screen flex items-center justify-center">
+      <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
+        <button onclick="location.href='/'" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
+        <h2 class="text-2xl font-bold text-center mb-6">プロフィールを完成させる</h2>
+
+        <form action="/onboarding" method="POST" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">生年月日</label>
+            <input type="date" name="birthday"
+              class="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500" required>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">性別</label>
+            <select name="gender"
+              class="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500" required>
+              <option value="">選択してください</option>
+              <option value="female">女性</option>
+              <option value="male">男性</option>
+              <option value="other">その他</option>
+              <option value="no_answer">回答しない</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium mb-1">ユーザーID（@から始まる）</label>
+            <input type="text" name="handle" placeholder="@example"
+              class="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500" required>
+          </div>
+
+          <div class="space-y-2 text-sm">
+            <label class="flex items-center gap-2">
+              <input type="checkbox" name="agree_tos" required>
+              <span>利用規約に同意します</span>
+            </label>
+            <label class="flex items-center gap-2">
+              <input type="checkbox" name="agree_privacy" required>
+              <span>プライバシーポリシーに同意します</span>
+            </label>
+          </div>
+
+          <button type="submit"
+            class="w-full mt-4 bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
+            登録する
+          </button>
+        </form>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+// オンボーディング POST
+app.post('/onboarding', async (req, res) => {
+  if (!req.user) return res.redirect('/login-modal');
+
+  try {
+    let { birthday, gender, handle, agree_tos, agree_privacy } = req.body;
+
+    handle = handle.trim();
+    if (!handle.startsWith('@')) {
+      handle = '@' + handle;
+    }
+
+    if (!agree_tos || !agree_privacy) {
+      return res.send(`
+        <script>
+          alert("利用規約とプライバシーポリシーへの同意が必要です。");
+          history.back();
+        </script>
+      `);
+    }
+
+    const now = new Date().toISOString();
+
+    const { error } = await supabase
+      .from('users')
+      .update({
+        birthday,
+        gender,
+        handle,
+        tos_agreed_at: now,
+        privacy_agreed_at: now
+      })
+      .eq('id', req.user.id);
+
+    if (error) {
+      console.error('Onboarding update error:', error);
+
+      if (error.code === '23505') {
+        return res.send(`
+          <script>
+            alert("そのユーザーID（@）はすでに使われています。別のIDを入力してください。");
+            history.back();
+          </script>
+        `);
+      }
+
+      return res.send(`
+        <script>
+          alert("プロフィール更新中にエラーが発生しました: ${error.message}");
+          history.back();
+        </script>
+      `);
+    }
+
+    return res.redirect('/');
+  } catch (e) {
+    console.error('POST /onboarding error:', e);
+    return res.send(`
+      <script>
+        alert("プロフィール更新中にサーバーエラーが発生しました");
+        history.back();
+      </script>
+    `);
   }
 });
 
@@ -344,8 +487,6 @@ app.get('/', async (req, res) => {
   const posts = postsData || [];
   const isLoggedIn = !!req.user;
 
-  console.log('HOME req.user:', req.user && { id: req.user.id, username: req.user.username });
-
   res.send(`
 <!DOCTYPE html>
 <html lang="ja">
@@ -357,12 +498,10 @@ app.get('/', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <!-- 左上タイトル -->
   <div class="fixed top-6 left-6 z-40">
     <h1 class="text-3xl font-bold text-indigo-600">sententia</h1>
   </div>
 
-  <!-- 右上 Log in / Log out ボタン（動的） -->
   <form id="logout-form" action="/logout" method="POST" style="display:none;"></form>
   <button
     onclick="${
@@ -374,10 +513,8 @@ app.get('/', async (req, res) => {
     ${isLoggedIn ? 'Log out' : 'Log in'}
   </button>
 
-  <!-- メインコンテンツ -->
   <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
 
-    <!-- 検索ボックス -->
     <div class="relative mb-8">
       <input type="text" placeholder="キーワードで検索" class="w-full pl-12 pr-6 py-4 text-lg rounded-full border border-gray-300 focus:outline-none focus:border-indigo-500">
       <svg class="absolute left-4 top-5 w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -385,7 +522,6 @@ app.get('/', async (req, res) => {
       </svg>
     </div>
 
-    <!-- 最近のトピック -->
     <h2 class="text-2xl font-bold mb-6">最近のトピック</h2>
     <div class="space-y-4">
       ${posts
@@ -424,7 +560,6 @@ app.get('/', async (req, res) => {
     </div>
   </div>
 
-  <!-- 投稿ボタン（ログインチェック付き） -->
   <button
     onclick="${
       isLoggedIn
@@ -435,7 +570,6 @@ app.get('/', async (req, res) => {
     投稿する
   </button>
 
-  <!-- 投稿モーダル -->
   <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
       <button onclick="document.getElementById('modal').classList.add('hidden')"
@@ -480,8 +614,8 @@ app.get('/', async (req, res) => {
 app.post('/logout', (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
-    res.redirect('/login-modal');
   });
+  res.redirect('/login-modal');
 });
 
 // 投稿エンドポイント（ログイン必須）
