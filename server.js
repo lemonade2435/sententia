@@ -11,7 +11,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Render 等のプロキシ環境だとセッション維持に必要
+// プロキシ環境向け（Render 等）
 app.set('trust proxy', 1);
 
 // Redisクライアント
@@ -30,7 +30,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: false, // デバッグ優先。https 本番では true にする
+      secure: false, // デバッグ優先。本番 HTTPS で true にしてOK
       httpOnly: true,
       sameSite: 'lax',
       maxAge: 24 * 60 * 60 * 1000
@@ -46,7 +46,7 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// プロフィール完成チェック用ヘルパー
+// プロフィール完成チェック
 function needsOnboarding(user) {
   if (!user) return true;
   return !(
@@ -125,7 +125,6 @@ app.get(
   '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/login-modal' }),
   (req, res) => {
-    // Googleログイン後もプロフィールチェック
     if (needsOnboarding(req.user)) {
       return res.redirect('/onboarding');
     }
@@ -252,7 +251,7 @@ app.get('/signup', (req, res) => {
   `);
 });
 
-// ローカルサインアップ（ユーザー作成）
+// ローカルサインアップ
 app.post('/signup', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -284,7 +283,6 @@ app.post('/signup', async (req, res) => {
       `);
     }
 
-    // 作成後は通常のログイン画面へ
     return res.redirect('/login-modal');
   } catch (e) {
     console.error('POST /signup error:', e);
@@ -304,7 +302,9 @@ app.post('/login', async (req, res, next) => {
 
     const { data: user, error } = await supabase
       .from('users')
-      .select('id, username, password, birthday, gender, handle, tos_agreed_at, privacy_agreed_at')
+      .select(
+        'id, username, password, birthday, gender, handle, tos_agreed_at, privacy_agreed_at'
+      )
       .eq('username', username)
       .single();
 
@@ -342,7 +342,7 @@ app.post('/login', async (req, res, next) => {
   }
 });
 
-// 追加情報登録画面（オンボーディング）
+// オンボーディング画面（追加情報登録）
 app.get('/onboarding', (req, res) => {
   if (!req.user) return res.redirect('/login-modal');
 
@@ -388,11 +388,15 @@ app.get('/onboarding', (req, res) => {
           <div class="space-y-2 text-sm">
             <label class="flex items-center gap-2">
               <input type="checkbox" name="agree_tos" required>
-              <span>利用規約に同意します</span>
+              <span>
+                <a href="/terms" class="text-blue-500 underline" target="_blank">利用規約</a> に同意します
+              </span>
             </label>
             <label class="flex items-center gap-2">
               <input type="checkbox" name="agree_privacy" required>
-              <span>プライバシーポリシーに同意します</span>
+              <span>
+                <a href="/privacy" class="text-blue-500 underline" target="_blank">プライバシーポリシー</a> に同意します
+              </span>
             </label>
           </div>
 
@@ -473,12 +477,143 @@ app.post('/onboarding', async (req, res) => {
   }
 });
 
-// ホーム（未ログインでも閲覧可）
+// 利用規約ページ
+app.get('/terms', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+      <title>利用規約 - sententia</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-gray-100 min-h-screen">
+      <div class="max-w-3xl mx-auto px-4 py-10">
+        <h1 class="text-3xl font-bold mb-6">sententia 利用規約</h1>
+        <p class="text-sm text-gray-500 mb-6">最終更新日: 2025年1月1日（例）</p>
+
+        <h2 class="text-xl font-semibold mt-6 mb-2">第1条（適用）</h2>
+        <p class="mb-4">
+          本規約は、ユーザーが sententia（以下「本サービス」）を利用する際の一切の行為に適用されます。
+          ユーザーは、本サービスを利用することにより、本規約に同意したものとみなされます。
+        </p>
+
+        <h2 class="text-xl font-semibold mt-6 mb-2">第2条（アカウント）</h2>
+        <p class="mb-4">
+          ユーザーは、正確かつ最新の情報をもってアカウントを作成し、その管理責任を負うものとします。
+          アカウント情報の不正利用等が発生した場合でも、本サービス運営者は一切の責任を負いません。
+        </p>
+
+        <h2 class="text-xl font-semibold mt-6 mb-2">第3条（禁止事項）</h2>
+        <p class="mb-2">ユーザーは、本サービスの利用にあたり、以下の行為を行ってはなりません。</p>
+        <ul class="list-disc pl-6 mb-4 space-y-1">
+          <li>法令または公序良俗に反する行為</li>
+          <li>他のユーザーまたは第三者に対する誹謗中傷・嫌がらせ行為</li>
+          <li>本サービスの運営を妨害する行為</li>
+          <li>不正アクセス、なりすまし等の不正行為</li>
+        </ul>
+
+        <h2 class="text-xl font-semibold mt-6 mb-2">第4条（投稿内容の取り扱い）</h2>
+        <p class="mb-4">
+          ユーザーは、自らが投稿した内容について必要な権利を有しているものとし、本サービス運営者に対して、
+          サービスの提供・改善・研究・分析等の目的で投稿内容を利用する非独占的な権利を許諾するものとします。
+        </p>
+
+        <h2 class="text-xl font-semibold mt-6 mb-2">第5条（免責）</h2>
+        <p class="mb-4">
+          本サービスは、提供する情報の正確性・完全性・有用性について保証するものではありません。
+          ユーザーは自己責任において本サービスを利用するものとし、利用により生じたいかなる損害についても、
+          本サービス運営者は責任を負いません。
+        </p>
+
+        <h2 class="text-xl font-semibold mt-6 mb-2">第6条（規約の変更）</h2>
+        <p class="mb-8">
+          本サービス運営者は、必要に応じて本規約を変更することができるものとします。
+          変更後の本規約は、本サービス上に掲示された時点で効力を生じるものとします。
+        </p>
+
+        <a href="/" class="text-blue-500 hover:underline">ホームに戻る</a>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+// プライバシーポリシーページ
+app.get('/privacy', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="ja">
+    <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+      <title>プライバシーポリシー - sententia</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-gray-100 min-h-screen">
+      <div class="max-w-3xl mx-auto px-4 py-10">
+        <h1 class="text-3xl font-bold mb-6">sententia プライバシーポリシー</h1>
+        <p class="text-sm text-gray-500 mb-6">最終更新日: 2025年1月1日（例）</p>
+
+        <h2 class="text-xl font-semibold mt-6 mb-2">第1条（収集する情報）</h2>
+        <p class="mb-4">
+          本サービスは、アカウント登録時にユーザー名、メールアドレス、パスワード、プロフィール情報（生年月日・性別・ユーザーIDなど）を収集します。
+          また、投稿内容やアクセスログ、利用状況等の情報を取得する場合があります。
+        </p>
+
+        <h2 class="text-xl font-semibold mt-6 mb-2">第2条（利用目的）</h2>
+        <p class="mb-2">収集した情報は、以下の目的で利用します。</p>
+        <ul class="list-disc pl-6 mb-4 space-y-1">
+          <li>本サービスの提供および運営のため</li>
+          <li>不正利用の防止・対策のため</li>
+          <li>サービス品質の向上、新機能の開発のため</li>
+          <li>お問い合わせへの対応のため</li>
+        </ul>
+
+        <h2 class="text-xl font-semibold mt-6 mb-2">第3条（第三者提供）</h2>
+        <p class="mb-4">
+          法令に基づく場合を除き、ユーザーの同意なく個人情報を第三者に提供することはありません。
+        </p>
+
+        <h2 class="text-xl font-semibold mt-6 mb-2">第4条（安全管理）</h2>
+        <p class="mb-4">
+          本サービスは、ユーザー情報への不正アクセス、紛失、改ざん、漏えい等を防止するために、適切な安全管理措置を講じます。
+        </p>
+
+        <h2 class="text-xl font-semibold mt-6 mb-2">第5条（ユーザーによる開示・訂正・削除）</h2>
+        <p class="mb-4">
+          ユーザーは、本サービス所定の方法により、自身の登録情報の閲覧・訂正・削除を行うことができます。
+        </p>
+
+        <h2 class="text-xl font-semibold mt-6 mb-2">第6条（プライバシーポリシーの変更）</h2>
+        <p class="mb-8">
+          本ポリシーの内容は、必要に応じて変更することがあります。
+          変更後の内容は、本サービス上に掲示した時点で効力を生じるものとします。
+        </p>
+
+        <a href="/" class="text-blue-500 hover:underline">ホームに戻る</a>
+      </div>
+    </body>
+    </html>
+  `);
+});
+
+// ホーム（検索付き・未ログインでも閲覧可）
 app.get('/', async (req, res) => {
-  const { data: postsData, error } = await supabase
+  const q = req.query.q || '';
+
+  let query = supabase
     .from('posts')
     .select('*, users(username)')
     .order('time', { ascending: false });
+
+  if (q) {
+    // 投稿本文に対するあいまい検索
+    query = query.ilike('text', `%${q}%`);
+  }
+
+  const { data: postsData, error } = await query;
 
   if (error) {
     console.error('Supabase posts error:', error);
@@ -515,12 +650,24 @@ app.get('/', async (req, res) => {
 
   <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
 
-    <div class="relative mb-8">
-      <input type="text" placeholder="キーワードで検索" class="w-full pl-12 pr-6 py-4 text-lg rounded-full border border-gray-300 focus:outline-none focus:border-indigo-500">
+    <!-- 検索フォーム -->
+    <form action="/" method="GET" class="relative mb-8">
+      <input
+        type="text"
+        name="q"
+        value="${q ? q.replace(/"/g, '&quot;') : ''}"
+        placeholder="キーワードで検索"
+        class="w-full pl-12 pr-6 py-4 text-lg rounded-full border border-gray-300 focus:outline-none focus:border-indigo-500">
       <svg class="absolute left-4 top-5 w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
       </svg>
-    </div>
+    </form>
+
+    ${
+      q
+        ? `<p class="text-sm text-gray-500 mb-4">「${q}」の検索結果：${posts.length}件</p>`
+        : ''
+    }
 
     <h2 class="text-2xl font-bold mb-6">最近のトピック</h2>
     <div class="space-y-4">
