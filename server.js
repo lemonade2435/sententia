@@ -367,8 +367,7 @@ if (!username || username.length < 1 || username.length > 20) {
       if (!finalHandle.startsWith('@')) finalHandle = '@' + finalHandle;
       if (finalHandle.length > 20) {
         return res.send(
-          \`<script>alert("ユーザーID（@〜）は20文字以内で入力してください。"); history.back();</script>\`
-        );
+          '<script>alert("ユーザーID（@〜）は20文字以内で入力してください。"); history.back();</script>');
       }
     } else {
       finalHandle = null;
