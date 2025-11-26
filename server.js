@@ -8,11 +8,18 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcrypt');
+const path = require('path');
 
 const app = express();
+
+// Renderなどプロキシ環境で secure cookie を正しく扱うため
 app.set('trust proxy', 1);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// /public 以下のファイルを / 直下で配信（/logo.png など）
+app.use(express.static(path.join(__dirname, 'public')));
 
 // =============================
 // Redis & セッション
@@ -59,7 +66,6 @@ passport.use(
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-        // 既存ユーザー確認
         let { data: user, error } = await supabase
           .from('users')
           .select('*')
@@ -80,7 +86,6 @@ passport.use(
             profile.displayName ||
             (email ? email.split('@')[0] : `user_${Date.now()}`);
 
-          // username / handle は 20 文字制限
           let username = baseName.slice(0, 20);
 
           let handle =
@@ -147,7 +152,6 @@ app.get(
 // ログイン / サインアップ画面
 // =============================
 
-// ログインモーダル（背景はホーム風＋暗くしてカード表示）
 app.get('/login-modal', async (req, res) => {
   const { data: postsData } = await supabase
     .from('posts')
@@ -168,10 +172,13 @@ app.get('/login-modal', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen relative">
 
-  <!-- 背景としてホーム風の簡略リスト -->
   <div class="pointer-events-none opacity-40">
     <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
-      <h1 class="text-3xl font-bold text-indigo-600 mb-6">sententia</h1>
+      <div class="flex items-center gap-3 mb-6">
+        <button onclick="location.href='/'" class="flex items-center">
+          <img src="/logo.png" alt="sententia" class="h-10 w-[180px] object-contain">
+        </button>
+      </div>
       <div class="space-y-4">
         ${posts
           .map(
@@ -214,10 +221,8 @@ app.get('/login-modal', async (req, res) => {
     </div>
   </div>
 
-  <!-- 黒いオーバーレイ -->
   <div class="absolute inset-0 bg-black bg-opacity-60 z-0"></div>
 
-  <!-- 中央のログインカード -->
   <div class="absolute inset-0 flex items-center justify-center z-10">
     <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
       <button onclick="location.href='/'"
@@ -254,7 +259,6 @@ app.get('/login-modal', async (req, res) => {
   `);
 });
 
-// サインアップ画面（利用規約/プライバシーポリシーモーダル付き）
 app.get('/signup', (req, res) => {
   res.send(`
 <!DOCTYPE html>
@@ -266,6 +270,12 @@ app.get('/signup', (req, res) => {
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
+  <div class="absolute top-6 left-6 z-40">
+    <button onclick="location.href='/'" class="flex items-center">
+      <img src="/logo.png" alt="sententia" class="h-10 w-[180px] object-contain">
+    </button>
+  </div>
+
   <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative z-10">
     <button onclick="location.href='/'"
             class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
@@ -302,7 +312,6 @@ app.get('/signup', (req, res) => {
     </p>
   </div>
 
-  <!-- 利用規約モーダル -->
   <div id="tos-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-6 relative">
       <button onclick="closeModal('tos-modal')"
@@ -318,7 +327,6 @@ app.get('/signup', (req, res) => {
     </div>
   </div>
 
-  <!-- プライバシーポリシーモーダル -->
   <div id="privacy-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-6 relative">
       <button onclick="closeModal('privacy-modal')"
@@ -346,14 +354,13 @@ app.get('/signup', (req, res) => {
   `);
 });
 
-// サインアップ処理
 app.post('/signup', async (req, res) => {
   try {
     const { username, password, handle } = req.body;
 
     if (!username || username.length > 20) {
       return res.send(
-        `<script>alert("ユーザー名は1〜20文字で入力してください。"); history.back();</script>`
+        \`<script>alert("ユーザー名は1〜20文字で入力してください。"); history.back();</script>\`
       );
     }
 
@@ -362,7 +369,7 @@ app.post('/signup', async (req, res) => {
       if (!finalHandle.startsWith('@')) finalHandle = '@' + finalHandle;
       if (finalHandle.length > 20) {
         return res.send(
-          `<script>alert("ユーザーID（@〜）は20文字以内で入力してください。"); history.back();</script>`
+          \`<script>alert("ユーザーID（@〜）は20文字以内で入力してください。"); history.back();</script>\`
         );
       }
     } else {
@@ -383,7 +390,7 @@ app.post('/signup', async (req, res) => {
 
     if (error) {
       return res.send(
-        `<script>alert("サインアップエラー: ${error.message}"); history.back();</script>`
+        \`<script>alert("サインアップエラー: \${error.message}"); history.back();</script>\`
       );
     }
 
@@ -391,12 +398,11 @@ app.post('/signup', async (req, res) => {
   } catch (err) {
     console.error('Supabase signup error:', err);
     return res.send(
-      `<script>alert("予期せぬエラーが発生しました。"); history.back();</script>`
+      '<script>alert("予期せぬエラーが発生しました。"); history.back();</script>'
     );
   }
 });
 
-// ローカルログイン
 app.post('/login', async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -408,14 +414,14 @@ app.post('/login', async (req, res) => {
 
     if (error || !user || !user.password) {
       return res.send(
-        `<script>alert("ユーザー名またはパスワードが違います。"); history.back();</script>`
+        '<script>alert("ユーザー名またはパスワードが違います。"); history.back();</script>'
       );
     }
 
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
       return res.send(
-        `<script>alert("ユーザー名またはパスワードが違います。"); history.back();</script>`
+        '<script>alert("ユーザー名またはパスワードが違います。"); history.back();</script>'
       );
     }
 
@@ -423,13 +429,13 @@ app.post('/login', async (req, res) => {
   } catch (err) {
     console.error('Login error:', err);
     return res.send(
-      `<script>alert("ログイン中にエラーが発生しました。"); history.back();</script>`
+      '<script>alert("ログイン中にエラーが発生しました。"); history.back();</script>'
     );
   }
 });
 
 // =============================
-// 設定（機能7）
+// 設定
 // =============================
 app.get('/settings', ensureAuthenticated, (req, res) => {
   const user = req.user;
@@ -444,10 +450,9 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <!-- 左上タイトル + プロフィールアイコン -->
   <div class="fixed top-6 left-6 z-40 flex items-center gap-3">
-    <button onclick="location.href='/'" class="text-3xl font-bold text-indigo-600">
-      sententia
+    <button onclick="location.href='/'" class="flex items-center">
+      <img src="/logo.png" alt="sententia" class="h-10 w-[180px] object-contain">
     </button>
     <button onclick="location.href='/me'"
             class="w-9 h-9 rounded-full flex items-center justify-center bg-blue-100">
@@ -457,7 +462,6 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
     </button>
   </div>
 
-  <!-- 右上 設定 & Log out -->
   <div class="fixed top-6 right-6 z-40 flex items-center gap-3">
     <button onclick="location.href='/settings'"
             class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">
@@ -512,7 +516,7 @@ app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
 
   if (!username || username.length > 20) {
     return res.send(
-      `<script>alert("ユーザー名は1〜20文字で入力してください。"); history.back();</script>`
+      '<script>alert("ユーザー名は1〜20文字で入力してください。"); history.back();</script>'
     );
   }
 
@@ -521,7 +525,7 @@ app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
     if (!finalHandle.startsWith('@')) finalHandle = '@' + finalHandle;
     if (finalHandle.length > 20) {
       return res.send(
-        `<script>alert("ユーザーID（@〜）は20文字以内で入力してください。"); history.back();</script>`
+        '<script>alert("ユーザーID（@〜）は20文字以内で入力してください。"); history.back();</script>'
       );
     }
   } else {
@@ -546,25 +550,22 @@ app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
     .single();
 
   req.login(updatedUser, () => {
-    res.send(`<script>alert("更新しました。"); location.href='/settings';</script>`);
+    res.send('<script>alert("更新しました。"); location.href="/settings";</script>');
   });
 });
 
 // =============================
-// プロフィール（簡易版：自分 & 他人）
+// プロフィール
 // =============================
 
-// 自分のプロフィール
 app.get('/me', ensureAuthenticated, (req, res) => {
   res.redirect('/profile/' + req.user.id);
 });
 
-// プロフィールページ
 app.get('/profile/:id', async (req, res) => {
   const profileUserId = req.params.id;
   const viewer = req.user;
 
-  // プロフィールユーザー取得
   const { data: profileUser, error: userError } = await supabase
     .from('users')
     .select('*')
@@ -575,7 +576,6 @@ app.get('/profile/:id', async (req, res) => {
     return res.send('<h1>ユーザーが見つかりませんでした。</h1>');
   }
 
-  // そのユーザーの投稿
   const { data: postsData } = await supabase
     .from('posts')
     .select('id, user_id, type, text, time, parent_post_id, users(username, handle)')
@@ -584,7 +584,6 @@ app.get('/profile/:id', async (req, res) => {
 
   const userPosts = postsData || [];
 
-  // そのユーザーが「いいね」した投稿
   let likedPosts = [];
   const { data: likesData } = await supabase
     .from('likes')
@@ -602,7 +601,6 @@ app.get('/profile/:id', async (req, res) => {
     likedPosts = likedData || [];
   }
 
-  // いいねマップ（このページ表示用）
   const allPosts = [...userPosts, ...likedPosts];
   let likesMap = {};
   if (allPosts.length > 0) {
@@ -625,19 +623,18 @@ app.get('/profile/:id', async (req, res) => {
     }
   }
 
-  const isSelf = viewer && viewer.id === profileUserId;
-
   function renderPostCard(p) {
     const likeInfo = likesMap[p.id] || { count: 0, likedByViewer: false };
     const likeIcon = likeInfo.likedByViewer ? '❤️' : '🤍';
     return `
       <div class="bg-white rounded-2xl p-4 shadow-md">
         <div class="flex items-start gap-3">
-          <div class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
+          <button onclick="location.href='/profile/${p.user_id}'"
+                  class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
             <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
               <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
             </svg>
-          </div>
+          </button>
           <div class="flex-1">
             <div class="flex items-center justify-between">
               <div>
@@ -663,8 +660,8 @@ app.get('/profile/:id', async (req, res) => {
               <button type="button"
                       onclick="${
                         viewer
-                          ? `location.href='/?replyTo=${p.id}'`
-                          : `location.href='/login-modal'`
+                          ? \`location.href='/?replyTo=\${p.id}'\`
+                          : 'location.href=\\'/login-modal\\''
                       }"
                       class="flex items-center gap-1 hover:text-blue-500">
                 💬
@@ -672,8 +669,8 @@ app.get('/profile/:id', async (req, res) => {
               <button type="button"
                       onclick="${
                         viewer
-                          ? `handleLike('${p.id}')`
-                          : `location.href='/login-modal'`
+                          ? \`handleLike('\${p.id}')\`
+                          : 'location.href=\\'/login-modal\\''
                       }"
                       class="flex items-center gap-1 hover:text-pink-500">
                 <span>${likeIcon}</span><span>${likeInfo.count}</span>
@@ -696,10 +693,9 @@ app.get('/profile/:id', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <!-- 左上タイトル + プロフィールアイコン -->
   <div class="fixed top-6 left-6 z-40 flex items-center gap-3">
-    <button onclick="location.href='/'" class="text-3xl font-bold text-indigo-600">
-      sententia
+    <button onclick="location.href='/'" class="flex items-center">
+      <img src="/logo.png" alt="sententia" class="h-10 w-[180px] object-contain">
     </button>
     ${
       viewer
@@ -715,7 +711,6 @@ app.get('/profile/:id', async (req, res) => {
     }
   </div>
 
-  <!-- 右上 設定 / Log in / Log out -->
   <div class="fixed top-6 right-6 z-40 flex items-center gap-3">
     ${
       viewer
@@ -741,7 +736,6 @@ app.get('/profile/:id', async (req, res) => {
   </div>
 
   <div class="max-w-2xl mx-auto pt-28 pb-16 px-4">
-    <!-- プロフィールヘッダー -->
     <div class="bg-white rounded-2xl shadow-md p-6 mb-6">
       <div class="flex items-center gap-4">
         <div class="w-16 h-16 rounded-full flex items-center justify-center bg-blue-100">
@@ -756,7 +750,6 @@ app.get('/profile/:id', async (req, res) => {
       </div>
     </div>
 
-    <!-- タブ -->
     <div class="flex border-b mb-4">
       <button id="tab-posts" onclick="showTab('posts')"
               class="flex-1 py-2 text-center font-semibold border-b-2 border-blue-500">
@@ -768,7 +761,6 @@ app.get('/profile/:id', async (req, res) => {
       </button>
     </div>
 
-    <!-- 投稿一覧 -->
     <div id="tab-posts-panel" class="space-y-4">
       ${
         userPosts.length === 0
@@ -777,7 +769,6 @@ app.get('/profile/:id', async (req, res) => {
       }
     </div>
 
-    <!-- いいねした投稿一覧 -->
     <div id="tab-likes-panel" class="space-y-4 hidden">
       ${
         likedPosts.length === 0
@@ -830,7 +821,7 @@ app.get('/profile/:id', async (req, res) => {
 });
 
 // =============================
-// ホーム + 投稿 / 返信 / いいね
+// ホーム
 // =============================
 
 app.get('/', async (req, res) => {
@@ -850,7 +841,6 @@ app.get('/', async (req, res) => {
   const { data: postsData, error: postsError } = await postsQuery;
   const posts = postsError || !postsData ? [] : postsData;
 
-  // いいね集計
   let likesMap = {};
   if (posts.length > 0) {
     const postIds = posts.map((p) => p.id);
@@ -872,7 +862,6 @@ app.get('/', async (req, res) => {
     }
   }
 
-  // 親投稿と返信
   const topPosts = posts.filter((p) => !p.parent_post_id);
   const repliesByParent = {};
   posts
@@ -893,10 +882,9 @@ app.get('/', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <!-- 左上タイトル + プロフィールアイコン -->
   <div class="fixed top-6 left-6 z-40 flex items-center gap-3">
-    <button onclick="location.href='/'" class="text-3xl font-bold text-indigo-600">
-      sententia
+    <button onclick="location.href='/'" class="flex items-center">
+      <img src="/logo.png" alt="sententia" class="h-10 w-[180px] object-contain">
     </button>
     ${
       user
@@ -912,7 +900,6 @@ app.get('/', async (req, res) => {
     }
   </div>
 
-  <!-- 右上 設定 + Log in / Log out -->
   <div class="fixed top-6 right-6 z-40 flex items-center gap-3">
     ${
       user
@@ -937,10 +924,8 @@ app.get('/', async (req, res) => {
     }
   </div>
 
-  <!-- メインコンテンツ -->
   <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
 
-    <!-- 検索ボックス -->
     <div class="relative mb-8">
       <form action="/" method="GET">
         <input type="text" name="q" value="${search}"
@@ -953,7 +938,6 @@ app.get('/', async (req, res) => {
       </form>
     </div>
 
-    <!-- 最近のトピック -->
     <h2 class="text-2xl font-bold mb-6">最近のトピック</h2>
     <div class="space-y-4">
       ${
@@ -970,7 +954,6 @@ app.get('/', async (req, res) => {
                 return `
         <div class="bg-white rounded-2xl p-4 shadow-md">
           <div class="flex items-start gap-3">
-            <!-- アイコン -->
             <button onclick="location.href='/profile/${p.user_id}'"
                     class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
               <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
@@ -1024,7 +1007,6 @@ app.get('/', async (req, res) => {
             </div>
           </div>
 
-          <!-- 返信一覧 -->
           ${
             replies.length > 0
               ? `
@@ -1070,7 +1052,6 @@ app.get('/', async (req, res) => {
     </div>
   </div>
 
-  <!-- 投稿ボタン -->
   <button onclick="${
     user
       ? "openPostModal('')"
@@ -1080,7 +1061,6 @@ app.get('/', async (req, res) => {
     投稿する
   </button>
 
-  <!-- 投稿 / 返信モーダル -->
   <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
       <button onclick="closePostModal()"
@@ -1153,7 +1133,7 @@ app.get('/', async (req, res) => {
         if (res.ok) {
           location.reload();
         } else {
-          alert('いいね処理に失敗しました。');
+          alert('いいねの処理に失敗しました。');
         }
       } catch (e) {
         alert('ネットワークエラーが発生しました。');
@@ -1165,7 +1145,9 @@ app.get('/', async (req, res) => {
   `);
 });
 
+// =============================
 // ログアウト
+// =============================
 app.post('/logout', (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
@@ -1173,13 +1155,13 @@ app.post('/logout', (req, res, next) => {
   });
 });
 
-// 投稿 / 返信（文字数制限：1〜200文字）
+// 投稿
 app.post('/post', ensureAuthenticated, async (req, res) => {
   const { type, opinion, parent_post_id } = req.body;
 
   if (!opinion || opinion.length === 0 || opinion.length > 200) {
     return res.send(
-      `<script>alert("投稿は1〜200文字で入力してください。"); history.back();</script>`
+      '<script>alert("投稿は1〜200文字で入力してください。"); history.back();</script>'
     );
   }
 
