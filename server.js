@@ -486,6 +486,9 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
 <div class="fixed top-0 left-0 z-40 flex items-center gap-3">
 
   <!-- プロフィールアイコン（丸く正方形のまま・右下寄りに） -->
+  <div class="fixed top-0 left-0 z-40 flex items-center gap-3">
+
+  <!-- プロフィールアイコン（丸く正方形のまま・右下寄りに） -->
   <button onclick="location.href='/me'"
           class="relative w-12 h-12 rounded-full bg-blue-100 ml-2 mt-2 overflow-hidden flex items-center justify-center">
     <svg viewBox="0 0 24 24"
@@ -494,6 +497,13 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
       <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
     </svg>
   </button>
+
+  <!-- ロゴ -->
+  <button onclick="location.href='/'" class="flex items-center mt-0">
+    <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
+  </button>
+
+</div>
 
   <!-- ロゴ -->
   <button onclick="location.href='/'" class="flex items-center mt-1">
