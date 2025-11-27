@@ -491,7 +491,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
     </svg>
   </button>
   <button onclick="location.href='/'" class="flex items-center mt-1">
-    <img src="/logo.png" alt="sententia" class="h-28 w-[900px] object-contain">
+    <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
   </button>
 </div>
 
