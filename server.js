@@ -598,7 +598,6 @@ app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
 app.get('/me', ensureAuthenticated, (req, res) => {
   res.redirect('/profile/' + req.user.id);
 });
-
 app.get('/profile/:id', async (req, res) => {
   const profileUserId = req.params.id;
   const viewer = req.user;
@@ -737,28 +736,16 @@ app.get('/profile/:id', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-<div class="fixed top-0 left-0 z-40 flex items-center gap-3">
-  ${
-    viewer
-      ? `
-  <button onclick="location.href='/me'"
-          class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 ml-2 mt-1">
-    <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
-      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-    </svg>
-  </button>
-  `
-      : ''
-  }
-  <button onclick="location.href='/'" class="flex items-center mt-1">
-    <img src="/logo.png" alt="sententia" class="h-28 w-[900px] object-contain">
-  </button>
-</div>
-
-  <div class="fixed top-6 right-6 z-40 flex items-center gap-3">
-    ${
-      viewer
-        ? `
+  <!-- プロフィールページのヘッダー：中央ロゴ、左に何も置かない（プロフィールボタンなし） -->
+  <div class="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 pt-1">
+    <div></div>
+    <button onclick="location.href='/'" class="flex items-center">
+      <img src="/logo.png" alt="sententia" class="h-16 object-contain">
+    </button>
+    <div class="flex items-center gap-3">
+      ${
+        viewer
+          ? `
       <button onclick="location.href='/settings'"
               class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">
         ⚙️
@@ -769,14 +756,15 @@ app.get('/profile/:id', async (req, res) => {
           Log out
         </button>
       </form>
-    `
-        : `
+      `
+          : `
       <button onclick="location.href='/login-modal'"
               class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
         Log in
       </button>
-    `
-    }
+      `
+      }
+    </div>
   </div>
 
   <div class="max-w-2xl mx-auto pt-32 pb-16 px-4">
@@ -930,28 +918,31 @@ app.get('/', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <div class="fixed top-2 left-2 z-40 flex items-center gap-3">
-    <button onclick="location.href='/'" class="flex items-center">
-      <img src="/logo.png" alt="sententia" class="h-24 w-[800px] object-contain">
-    </button>
-    ${
-      user
-        ? `
-    <button onclick="location.href='/me'"
-            class="w-9 h-9 rounded-full flex items-center justify-center bg-blue-100">
-      <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-500" fill="currentColor">
-        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-      </svg>
-    </button>
-    `
-        : ''
-    }
-  </div>
+  <!-- 上部ヘッダー：左 = プロフィール / 中央 = ロゴ / 右 = 設定 + ログイン系 -->
+  <div class="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 pt-1">
+    <div class="flex items-center gap-2">
+      ${
+        user
+          ? `
+      <button onclick="location.href='/me'"
+              class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
+        <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
+          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
+        </svg>
+      </button>
+      `
+          : ''
+      }
+    </div>
 
-  <div class="fixed top-6 right-6 z-40 flex items-center gap-3">
-    ${
-      user
-        ? `
+    <button onclick="location.href='/'" class="flex items-center">
+      <img src="/logo.png" alt="sententia" class="h-16 object-contain">
+    </button>
+
+    <div class="flex items-center gap-3">
+      ${
+        user
+          ? `
       <button onclick="location.href='/settings'"
               class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">
         ⚙️
@@ -962,17 +953,18 @@ app.get('/', async (req, res) => {
           Log out
         </button>
       </form>
-    `
-        : `
+      `
+          : `
       <button onclick="location.href='/login-modal'"
               class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
         Log in
       </button>
-    `
-    }
+      `
+      }
+    </div>
   </div>
 
-  <div class="max-w-2xl mx-auto pt-32 pb-32 px-4">
+  <div class="max-w-2xl mx-auto pt-28 pb-32 px-4">
 
     <div class="relative mb-8">
       <form action="/" method="GET">
