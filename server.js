@@ -748,7 +748,7 @@ app.get('/profile/:id', async (req, res) => {
   <div class="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 pt-1">
     <div></div>
     <button onclick="location.href='/'" class="flex items-center">
-      <img src="/logo.png" alt="sententia" class="h-16 object-contain">
+      <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
     </button>
     <div class="flex items-center gap-3">
       ${
@@ -944,7 +944,7 @@ app.get('/', async (req, res) => {
     </div>
 
     <button onclick="location.href='/'" class="flex items-center">
-      <img src="/logo.png" alt="sententia" class="h-16 object-contain">
+      <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
     </button>
 
     <div class="flex items-center gap-3">
