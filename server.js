@@ -12,13 +12,11 @@ const path = require('path');
 
 const app = express();
 
-// プロキシ越し(HTTPS)で secure cookie を正しく扱う
 app.set('trust proxy', 1);
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// /public 以下を静的配信（/logo.png など）
+// /public を静的配信（logo.png 用）
 app.use(express.static(path.join(__dirname, 'public')));
 
 // =============================
@@ -71,7 +69,6 @@ passport.use(
           .eq('google_id', profile.id)
           .single();
 
-        // PGRST116 = 行が見つからない → 無視して新規作成へ
         if (error && error.code !== 'PGRST116') {
           return done(error);
         }
@@ -137,6 +134,59 @@ function ensureAuthenticated(req, res, next) {
   return res.redirect('/login-modal');
 }
 
+// ロゴ真ん中＋左右にボタンの共通ヘッダー
+function renderHeader(user, opts = {}) {
+  const showProfileIcon = opts.showProfileIcon !== false;
+
+  const leftHtml =
+    user && showProfileIcon
+      ? `
+  <div class="absolute left-4 top-3">
+    <button onclick="location.href='/me'"
+            class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
+      <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
+        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
+      </svg>
+    </button>
+  </div>
+  `
+      : '';
+
+  const rightHtml = user
+    ? `
+  <div class="absolute right-4 top-3 flex items-center gap-3">
+    <button onclick="location.href='/settings'"
+            class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">
+      ⚙️
+    </button>
+    <form action="/logout" method="POST">
+      <button type="submit"
+              class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
+        Log out
+      </button>
+    </form>
+  </div>
+  `
+    : `
+  <div class="absolute right-4 top-3 flex items-center gap-3">
+    <button onclick="location.href='/login-modal'"
+            class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
+      Log in
+    </button>
+  </div>
+  `;
+
+  return `
+<div class="fixed top-0 left-0 right-0 z-40 pt-2 flex justify-center">
+  <button onclick="location.href='/'" class="flex items-center">
+    <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
+  </button>
+  ${leftHtml}
+  ${rightHtml}
+</div>
+`;
+}
+
 // =============================
 // OAuth ルート
 // =============================
@@ -152,21 +202,10 @@ app.get(
 );
 
 // =============================
-// ログインモーダル（背景にホーム＋暗く）
+// ログインモーダル
 // =============================
-app.get('/login-modal', async (req, res) => {
-  const { data: postsData } = await supabase
-    .from('posts')
-    .select(
-      'id, user_id, type, text, time, parent_post_id, users(username, handle)'
-    )
-    .order('time', { ascending: false })
-    .limit(10);
-
-  const posts = postsData || [];
-
-  res.send(`
-<!DOCTYPE html>
+app.get('/login-modal', (req, res) => {
+  res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -174,104 +213,48 @@ app.get('/login-modal', async (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 min-h-screen relative">
-
-  <!-- 背景（ホーム風） -->
-  <div class="pointer-events-none opacity-40">
-    <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
-      <div class="flex items-center gap-3 mb-6">
-        <button onclick="location.href='/'" class="flex items-center">
-          <img src="/logo.png" alt="sententia" class="h-24 w-[800px] object-contain">
-        </button>
-      </div>
-      <div class="space-y-4">
-        ${posts
-          .map(
-            (p) => `
-        <div class="bg-white rounded-2xl p-4 shadow-sm">
-          <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
-              <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-              </svg>
-            </div>
-            <div class="flex-1">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="text-sm font-semibold">${p.users?.username || 'ユーザー'}</div>
-                  <div class="text-xs text-gray-500">${p.users?.handle || '@user'}</div>
-                </div>
-                <div class="flex items-center gap-2 text-xs text-gray-500">
-                  <span class="px-2 py-0.5 rounded-full text-xs font-medium ${
-                    p.type === 'company'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-purple-100 text-purple-700'
-                  }">
-                    ${p.type === 'company' ? '企業' : '物事'}
-                  </span>
-                  <span>${new Date(p.time).toLocaleString('ja-JP', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}</span>
-                </div>
-              </div>
-              <p class="mt-2 text-sm break-words">${p.text}</p>
-            </div>
-          </div>
-        </div>
-        `
-          )
-          .join('')}
-      </div>
-    </div>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
+  <div class="absolute top-2 left-1/2 -translate-x-1/2">
+    <button onclick="location.href='/'" class="flex items-center">
+      <img src="/logo.png" alt="sententia" class="h-24 w-[800px] object-contain">
+    </button>
   </div>
 
-  <!-- 暗くするオーバーレイ -->
-  <div class="absolute inset-0 bg-black bg-opacity-60 z-0"></div>
+  <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative mt-20">
+    <button onclick="location.href='/'"
+            class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
+    <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
 
-  <!-- 中央ログインモーダル -->
-  <div class="absolute inset-0 flex items-center justify-center z-10">
-    <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
-      <button onclick="location.href='/'"
-              class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
-      <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
+    <form action="/login" method="POST" class="mb-4">
+      <input type="text" name="username" placeholder="ユーザー名" maxlength="20" required
+             class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-3 focus:outline-none focus:border-blue-500">
+      <input type="password" name="password" placeholder="パスワード" required
+             class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+      <button type="submit"
+              class="w-full bg-black text-white py-3 rounded-2xl font-semibold hover:bg-gray-800">
+        Log in
+      </button>
+    </form>
 
-      <form action="/login" method="POST" class="mb-4">
-        <input type="text" name="username" placeholder="ユーザー名"
-               maxlength="20"
-               required
-               class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-3 focus:outline-none focus:border-blue-500">
-        <input type="password" name="password" placeholder="パスワード"
-               required
-               class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
-        <button type="submit"
-                class="w-full bg-black text-white py-3 rounded-2xl font-semibold hover:bg-gray-800">
-          Log in
-        </button>
-      </form>
+    <a href="/auth/google"
+       class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600 mt-2">
+      Googleでログイン
+    </a>
 
-      <a href="/auth/google"
-         class="w-full block bg-red-500 text-white py-3 rounded-2xl text-center font-semibold hover:bg-red-600 mt-2">
-        Googleでログイン
-      </a>
-
-      <p class="text-center text-gray-500 mt-4">
-        アカウントをお持ちでないですか？
-        <a href="/signup" class="text-blue-500 hover:text-blue-700">Sign up</a>
-      </p>
-    </div>
+    <p class="text-center text-gray-500 mt-4">
+      アカウントをお持ちでないですか？
+      <a href="/signup" class="text-blue-500 hover:text-blue-700">Sign up</a>
+    </p>
   </div>
 </body>
-</html>
-  `);
+</html>`);
 });
 
 // =============================
 // サインアップ画面
 // =============================
 app.get('/signup', (req, res) => {
-  res.send(`
-<!DOCTYPE html>
+  res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -280,23 +263,21 @@ app.get('/signup', (req, res) => {
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
-  <div class="absolute top-2 left-2 z-40">
+  <div class="absolute top-2 left-1/2 -translate-x-1/2">
     <button onclick="location.href='/'" class="flex items-center">
       <img src="/logo.png" alt="sententia" class="h-24 w-[800px] object-contain">
     </button>
   </div>
 
-  <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative z-10">
+  <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative mt-20">
     <button onclick="location.href='/'"
             class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
     <h2 class="text-2xl font-bold text-center mb-6">アカウントを作成</h2>
     <form action="/signup" method="POST">
       <input type="text" name="username" placeholder="ユーザー名（20文字まで）"
-             maxlength="20"
-             required
+             maxlength="20" required
              class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
-      <input type="password" name="password" placeholder="パスワード"
-             required
+      <input type="password" name="password" placeholder="パスワード" required
              class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
       <input type="text" name="handle" placeholder="@ユーザーID（任意、20文字まで）"
              maxlength="20"
@@ -338,7 +319,6 @@ app.get('/signup', (req, res) => {
         <p>ユーザーは、法令および公序良俗に反する内容を投稿してはなりません。</p>
         <p>運営は、不適切と判断した投稿を削除する場合があります。</p>
         <p>本サービスは予告なく内容の変更、一時停止、終了を行うことがあります。</p>
-        <p>詳細な規約内容は将来アップデートされる可能性があります。</p>
       </div>
     </div>
   </div>
@@ -353,7 +333,6 @@ app.get('/signup', (req, res) => {
         <p>本サービスは、ユーザー登録やログインに必要な最小限の情報のみを取得します。</p>
         <p>取得した情報は、認証、サービス改善、セキュリティ確保の目的のみに利用します。</p>
         <p>本人の同意なく第三者に個人情報を提供することはありません（法令に基づく場合を除く）。</p>
-        <p>アクセスログ等は、統計的な分析に用いることがありますが、個人を特定することはありません。</p>
       </div>
     </div>
   </div>
@@ -367,8 +346,7 @@ app.get('/signup', (req, res) => {
     }
   </script>
 </body>
-</html>
-  `);
+</html>`);
 });
 
 // =============================
@@ -472,8 +450,9 @@ app.post('/login', async (req, res) => {
 // =============================
 app.get('/settings', ensureAuthenticated, (req, res) => {
   const user = req.user;
-  res.send(`
-<!DOCTYPE html>
+  const header = renderHeader(user, { showProfileIcon: true });
+
+  res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -482,37 +461,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
-
-<!-- 設定画面の新しいヘッダー（ホームと同じ形） -->
-<div class="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 pt-1">
-  <!-- 左：プロフィールボタン（丸） -->
-  <div class="flex items-center gap-2">
-    <button onclick="location.href='/me'"
-            class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
-      <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
-        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-      </svg>
-    </button>
-  </div>
-
-  <!-- ロゴ -->
-  <button onclick="location.href='/'" class="flex items-center">
-    <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
-  </button>
-
-  <div class="fixed top-6 right-6 z-40 flex items-center gap-3">
-    <button onclick="location.href='/settings'"
-            class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">
-      ⚙️
-    </button>
-    <form action="/logout" method="POST">
-      <button type="submit"
-              class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-        Log out
-      </button>
-    </form>
-  </div>
-
+  ${header}
   <div class="max-w-xl mx-auto pt-32 pb-16 px-4">
     <h1 class="text-2xl font-bold mb-6">設定</h1>
 
@@ -526,8 +475,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
       <form id="user-info-form" action="/settings/profile" method="POST" class="mt-4 hidden">
         <label class="block mb-3 text-sm text-gray-600">ユーザー名（20文字まで）</label>
         <input type="text" name="username" maxlength="20"
-               value="${user.username || ''}"
-               required
+               value="${user.username || ''}" required
                class="w-full px-4 py-2 border border-gray-300 rounded-xl mb-4 focus:outline-none focus:border-blue-500">
 
         <label class="block mb-3 text-sm text-gray-600">ユーザーID（@から始まる、20文字まで）</label>
@@ -544,8 +492,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
     </div>
   </div>
 </body>
-</html>
-  `);
+</html>`);
 });
 
 app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
@@ -603,6 +550,7 @@ app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
 app.get('/me', ensureAuthenticated, (req, res) => {
   res.redirect('/profile/' + req.user.id);
 });
+
 app.get('/profile/:id', async (req, res) => {
   const profileUserId = req.params.id;
   const viewer = req.user;
@@ -730,8 +678,19 @@ app.get('/profile/:id', async (req, res) => {
     `;
   }
 
-  res.send(`
-<!DOCTYPE html>
+  const header = renderHeader(viewer, { showProfileIcon: false });
+
+  const postsHtml =
+    userPosts.length === 0
+      ? '<p class="text-gray-500 text-sm">まだ投稿がありません。</p>'
+      : userPosts.map((p) => renderPostCard(p)).join('');
+
+  const likesHtml =
+    likedPosts.length === 0
+      ? '<p class="text-gray-500 text-sm">まだいいねした投稿がありません。</p>'
+      : likedPosts.map((p) => renderPostCard(p)).join('');
+
+  res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -740,38 +699,7 @@ app.get('/profile/:id', async (req, res) => {
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
-
-  <!-- プロフィールページのヘッダー：中央ロゴ、左に何も置かない（プロフィールボタンなし） -->
-  <div class="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 pt-1">
-    <div></div>
-    <button onclick="location.href='/'" class="flex items-center">
-      <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
-    </button>
-    <div class="flex items-center gap-3">
-      ${
-        viewer
-          ? `
-      <button onclick="location.href='/settings'"
-              class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">
-        ⚙️
-      </button>
-      <form action="/logout" method="POST">
-        <button type="submit"
-                class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-          Log out
-        </button>
-      </form>
-      `
-          : `
-      <button onclick="location.href='/login-modal'"
-              class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-        Log in
-      </button>
-      `
-      }
-    </div>
-  </div>
-
+  ${header}
   <div class="max-w-2xl mx-auto pt-32 pb-16 px-4">
     <div class="bg-white rounded-2xl shadow-md p-6 mb-6">
       <div class="flex items-center gap-4">
@@ -799,19 +727,11 @@ app.get('/profile/:id', async (req, res) => {
     </div>
 
     <div id="tab-posts-panel" class="space-y-4">
-      ${
-        userPosts.length === 0
-          ? `<p class="text-gray-500 text-sm">まだ投稿がありません。</p>`
-          : userPosts.map((p) => renderPostCard(p)).join('')
-      }
+      ${postsHtml}
     </div>
 
     <div id="tab-likes-panel" class="space-y-4 hidden">
-      ${
-        likedPosts.length === 0
-          ? `<p class="text-gray-500 text-sm">まだいいねした投稿がありません。</p>`
-          : likedPosts.map((p) => renderPostCard(p)).join('')
-      }
+      ${likesHtml}
     </div>
   </div>
 
@@ -853,8 +773,7 @@ app.get('/profile/:id', async (req, res) => {
     }
   </script>
 </body>
-</html>
-  `);
+</html>`);
 });
 
 // =============================
@@ -912,8 +831,124 @@ app.get('/', async (req, res) => {
       repliesByParent[p.parent_post_id].push(p);
     });
 
-  res.send(`
-<!DOCTYPE html>
+  function renderPostCard(p, replies) {
+    const likeInfo = likesMap[p.id] || {
+      count: 0,
+      likedByUser: false
+    };
+    const likeIcon = likeInfo.likedByUser ? '❤️' : '🤍';
+
+    const repliesHtml =
+      replies && replies.length > 0
+        ? `
+      <div class="mt-3 border-l pl-4 space-y-2">
+        ${replies
+          .map(
+            (r) => `
+          <div class="flex items-start gap-2">
+            <button onclick="location.href='/profile/${r.user_id}'"
+                    class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50">
+              <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-400" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
+              </svg>
+            </button>
+            <div class="flex-1">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-xs font-semibold">${r.users?.username || 'ユーザー'}</div>
+                  <div class="text-[11px] text-gray-500">${r.users?.handle || '@user'}</div>
+                </div>
+                <span class="text-[11px] text-gray-400">
+                  ${new Date(r.time).toLocaleString('ja-JP', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+              </div>
+              <p class="mt-1 text-xs whitespace-pre-wrap break-words">${r.text}</p>
+            </div>
+          </div>
+        `
+          )
+          .join('')}
+      </div>
+    `
+        : '';
+
+    return `
+      <div class="bg-white rounded-2xl p-4 shadow-md">
+        <div class="flex items-start gap-3">
+          <button onclick="location.href='/profile/${p.user_id}'"
+                  class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
+            <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
+            </svg>
+          </button>
+
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-sm font-semibold">${p.users?.username || 'ユーザー'}</div>
+                <div class="text-xs text-gray-500">${p.users?.handle || '@user'}</div>
+              </div>
+              <div class="flex items-center gap-2 text-xs text-gray-500">
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium ${
+                  p.type === 'company'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-purple-100 text-purple-700'
+                }">
+                  ${p.type === 'company' ? '企業' : '物事'}
+                </span>
+                <span>${new Date(p.time).toLocaleString('ja-JP', {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</span>
+              </div>
+            </div>
+
+            <p class="mt-2 text-sm whitespace-pre-wrap break-words">${p.text}</p>
+
+            <div class="mt-3 flex items-center gap-6 text-sm text-gray-500">
+              <button type="button"
+                      onclick="${
+                        user
+                          ? `openPostModal('${p.id}')`
+                          : "location.href='/login-modal'"
+                      }"
+                      class="flex items-center gap-1 hover:text-blue-500">
+                💬<span>${replies ? replies.length : 0}</span>
+              </button>
+              <button type="button"
+                      onclick="${
+                        user
+                          ? `handleLike('${p.id}')`
+                          : "location.href='/login-modal'"
+                      }"
+                      class="flex items-center gap-1 hover:text-pink-500">
+                <span>${likeIcon}</span><span>${likeInfo.count}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        ${repliesHtml}
+      </div>
+    `;
+  }
+
+  const header = renderHeader(user, { showProfileIcon: true });
+
+  const postsHtml =
+    topPosts.length === 0
+      ? '<p class="text-gray-500">まだ投稿がありません。</p>'
+      : topPosts
+          .map((p) => renderPostCard(p, repliesByParent[p.id] || []))
+          .join('');
+
+  const replyToScript = replyTo
+    ? `document.addEventListener('DOMContentLoaded', () => openPostModal('${replyTo}'));`
+    : '';
+
+  res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -922,49 +957,9 @@ app.get('/', async (req, res) => {
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen">
+  ${header}
 
-<!-- ホーム画面ヘッダー（ロゴ中央） -->
-<div class="fixed top-0 left-0 right-0 z-40 pt-2 flex justify-center">
-
-  <!-- 中央：ロゴ -->
-  <button onclick="location.href='/'" class="flex items-center">
-    <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
-  </button>
-
-  <!-- 左：プロフィールボタン -->
-  <div class="absolute left-4 top-3">
-    <button onclick="location.href='/me'"
-            class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
-      <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
-        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-      </svg>
-    </button>
-  </div>
-
-  <!-- 右：設定 & Log out -->
-  <div class="absolute right-4 top-3 flex items-center gap-3">
-      <button onclick="location.href='/settings'"
-              class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">
-        ⚙️
-      </button>
-      <form action="/logout" method="POST">
-        <button type="submit"
-                class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-          Log out
-        </button>
-      </form>
-      `
-          : `
-      <button onclick="location.href='/login-modal'"
-              class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-        Log in
-      </button>
-      `
-      }
-    </div>
-  </div>
-
-  <div class="max-w-2xl mx-auto pt-28 pb-32 px-4">
+  <div class="max-w-2xl mx-auto pt-32 pb-32 px-4">
 
     <div class="relative mb-8">
       <form action="/" method="GET">
@@ -980,116 +975,7 @@ app.get('/', async (req, res) => {
 
     <h2 class="text-2xl font-bold mb-6">最近のトピック</h2>
     <div class="space-y-4">
-      ${
-        topPosts.length === 0
-          ? '<p class="text-gray-500">まだ投稿がありません。</p>'
-          : topPosts
-              .map((p) => {
-                const likeInfo = likesMap[p.id] || {
-                  count: 0,
-                  likedByUser: false
-                };
-                const likeIcon = likeInfo.likedByUser ? '❤️' : '🤍';
-                const replies = repliesByParent[p.id] || [];
-
-                return `
-        <div class="bg-white rounded-2xl p-4 shadow-md">
-          <div class="flex items-start gap-3">
-            <button onclick="location.href='/profile/${p.user_id}'"
-                    class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
-              <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-              </svg>
-            </button>
-
-            <div class="flex-1">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="text-sm font-semibold">${p.users?.username || 'ユーザー'}</div>
-                  <div class="text-xs text-gray-500">${p.users?.handle || '@user'}</div>
-                </div>
-                <div class="flex items-center gap-2 text-xs text-gray-500">
-                  <span class="px-2 py-0.5 rounded-full text-xs font-medium ${
-                    p.type === 'company'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-purple-100 text-purple-700'
-                  }">
-                    ${p.type === 'company' ? '企業' : '物事'}
-                  </span>
-                  <span>${new Date(p.time).toLocaleString('ja-JP', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}</span>
-                </div>
-              </div>
-
-              <p class="mt-2 text-sm whitespace-pre-wrap break-words">${p.text}</p>
-
-              <div class="mt-3 flex items-center gap-6 text-sm text-gray-500">
-                <button type="button"
-                        onclick="${
-                          user
-                            ? `openPostModal('${p.id}')`
-                            : "location.href='/login-modal'"
-                        }"
-                        class="flex items-center gap-1 hover:text-blue-500">
-                  💬<span>${replies.length}</span>
-                </button>
-                <button type="button"
-                        onclick="${
-                          user
-                            ? `handleLike('${p.id}')`
-                            : "location.href='/login-modal'"
-                        }"
-                        class="flex items-center gap-1 hover:text-pink-500">
-                  <span>${likeIcon}</span><span>${likeInfo.count}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          ${
-            replies.length > 0
-              ? `
-            <div class="mt-3 border-l pl-4 space-y-2">
-              ${replies
-                .map(
-                  (r) => `
-                <div class="flex items-start gap-2">
-                  <button onclick="location.href='/profile/${r.user_id}'"
-                          class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50">
-                    <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-400" fill="currentColor">
-                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-                    </svg>
-                  </button>
-                  <div class="flex-1">
-                    <div class="flex items-center justify-between">
-                      <div>
-                        <div class="text-xs font-semibold">${r.users?.username || 'ユーザー'}</div>
-                        <div class="text-[11px] text-gray-500">${r.users?.handle || '@user'}</div>
-                      </div>
-                      <span class="text-[11px] text-gray-400">
-                        ${new Date(r.time).toLocaleString('ja-JP', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
-                    </div>
-                    <p class="mt-1 text-xs whitespace-pre-wrap break-words">${r.text}</p>
-                  </div>
-                </div>
-              `
-                )
-                .join('')}
-            </div>
-          `
-              : ''
-          }
-        </div>
-      `;
-              })
-              .join('')
-      }
+      ${postsHtml}
     </div>
   </div>
 
@@ -1102,7 +988,6 @@ app.get('/', async (req, res) => {
     投稿する
   </button>
 
-  <!-- 投稿モーダル -->
   <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
       <button onclick="closePostModal()"
@@ -1161,11 +1046,7 @@ app.get('/', async (req, res) => {
       document.getElementById('parent_post_id_input').value = '';
     }
 
-    ${
-      replyTo
-        ? `document.addEventListener('DOMContentLoaded', () => openPostModal('${replyTo}'));`
-        : ''
-    }
+    ${replyToScript}
 
     async function handleLike(postId) {
       try {
@@ -1181,8 +1062,7 @@ app.get('/', async (req, res) => {
     }
   </script>
 </body>
-</html>
-  `);
+</html>`);
 });
 
 // =============================
@@ -1244,19 +1124,20 @@ app.post('/like/:postId', ensureAuthenticated, async (req, res) => {
       .from('likes')
       .select('id')
       .eq('user_id', userId)
-      .eq('post_id', postId)
-      .maybeSingle();
+      .eq('post_id', postId);
 
     if (existingError) {
       console.error('like select error', existingError);
       return res.status(500).send('error');
     }
 
-    if (existing) {
+    const like = existing && existing.length > 0 ? existing[0] : null;
+
+    if (like) {
       const { error: deleteError } = await supabase
         .from('likes')
         .delete()
-        .eq('id', existing.id);
+        .eq('id', like.id);
 
       if (deleteError) {
         console.error('like delete error', deleteError);
