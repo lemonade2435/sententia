@@ -485,7 +485,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
 
 <div class="fixed top-0 left-0 z-40 flex items-center gap-3">
   <button onclick="location.href='/me'"
-          class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 ml-2 mt-1">
+          class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 ml-0 mt-0">
     <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
       <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
     </svg>
