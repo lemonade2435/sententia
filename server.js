@@ -496,12 +496,9 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
   </div>
 
   <!-- ロゴ -->
-  <button onclick="location.href='/'" class="flex items-center mt-0">
+  <button onclick="location.href='/'" class="flex items-center">
     <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
   </button>
-
-</div>
-
 
   <div class="fixed top-6 right-6 z-40 flex items-center gap-3">
     <button onclick="location.href='/settings'"
@@ -926,31 +923,26 @@ app.get('/', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <!-- 上部ヘッダー：左 = プロフィール / 中央 = ロゴ / 右 = 設定 + ログイン系 -->
-  <div class="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 pt-1">
-    <div class="flex items-center gap-2">
-      ${
-        user
-          ? `
-      <button onclick="location.href='/me'"
-              class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
-        <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
-          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-        </svg>
-      </button>
-      `
-          : ''
-      }
-    </div>
+<!-- ホーム画面ヘッダー（ロゴ中央） -->
+<div class="fixed top-0 left-0 right-0 z-40 pt-2 flex justify-center">
 
-    <button onclick="location.href='/'" class="flex items-center">
-      <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
+  <!-- 中央：ロゴ -->
+  <button onclick="location.href='/'" class="flex items-center">
+    <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
+  </button>
+
+  <!-- 左：プロフィールボタン -->
+  <div class="absolute left-4 top-3">
+    <button onclick="location.href='/me'"
+            class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
+      <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
+        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
+      </svg>
     </button>
+  </div>
 
-    <div class="flex items-center gap-3">
-      ${
-        user
-          ? `
+  <!-- 右：設定 & Log out -->
+  <div class="absolute right-4 top-3 flex items-center gap-3">
       <button onclick="location.href='/settings'"
               class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">
         ⚙️
