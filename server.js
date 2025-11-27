@@ -178,7 +178,7 @@ function renderHeader(user, opts = {}) {
 
   return `
 <div class="fixed top-0 left-0 right-0 z-40 pt-0 flex justify-center">
-  <button onclick="location.href='/'" class="flex items-center -mt-1">
+  <button onclick="location.href='/'" class="flex items-center -mt-3">
     <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
   </button>
   ${leftHtml}
