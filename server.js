@@ -181,7 +181,7 @@ app.get('/login-modal', async (req, res) => {
     <div class="max-w-2xl mx-auto pt-24 pb-32 px-4">
       <div class="flex items-center gap-3 mb-6">
         <button onclick="location.href='/'" class="flex items-center">
-          <img src="/logo.png" alt="sententia" class="h-30 w-[840px] object-contain">
+          <img src="/logo.png" alt="sententia" class="h-25 w-[700px] object-contain">
         </button>
       </div>
       <div class="space-y-4">
@@ -290,9 +290,9 @@ app.get('/signup', (req, res) => {
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center relative">
-  <div class="absolute top-3 left-3 z-40">
+  <div class="absolute top-1 left-1 z-40">
     <button onclick="location.href='/'" class="flex items-center">
-      <img src="/logo.png" alt="sententia" class="h-30 w-[840px] object-contain">
+      <img src="/logo.png" alt="sententia" class="h-25 w-[700px] object-contain">
     </button>
   </div>
 
@@ -497,9 +497,9 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <div class="fixed top-3 left-3 z-40 flex items-center gap-3">
+  <div class="fixed top-1 left-1 z-40 flex items-center gap-3">
     <button onclick="location.href='/'" class="flex items-center">
-      <img src="/logo.png" alt="sententia" class="h-30 w-[840px] object-contain">
+      <img src="/logo.png" alt="sententia" class="h-25 w-[700px] object-contain">
     </button>
     <button onclick="location.href='/me'"
             class="w-9 h-9 rounded-full flex items-center justify-center bg-blue-100">
@@ -768,9 +768,9 @@ app.get('/profile/:id', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <div class="fixed top-3 left-3 z-40 flex items-center gap-3">
+  <div class="fixed top-1 left-1 z-40 flex items-center gap-3">
     <button onclick="location.href='/'" class="flex items-center">
-      <img src="/logo.png" alt="sententia" class="h-30 w-[840px] object-contain">
+      <img src="/logo.png" alt="sententia" class="h-25 w-[700px] object-contain">
     </button>
     ${
       viewer
@@ -958,9 +958,9 @@ app.get('/', async (req, res) => {
 </head>
 <body class="bg-gray-100 min-h-screen">
 
-  <div class="fixed top-3 left-3 z-40 flex items-center gap-3">
+  <div class="fixed top-1 left-1 z-40 flex items-center gap-3">
     <button onclick="location.href='/'" class="flex items-center">
-      <img src="/logo.png" alt="sententia" class="h-30 w-[840px] object-contain">
+      <img src="/logo.png" alt="sententia" class="h-25 w-[700px] object-contain">
     </button>
     ${
       user
