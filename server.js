@@ -127,15 +127,15 @@ passport.deserializeUser(async (id, done) => {
 });
 
 // =============================
-// 言語をユーザーから取得（未設定ならja-JP）
+// 言語 / 翻訳
 // =============================
+
+// ユーザーから言語を取得（未設定なら ja-JP）
 function getLang(req) {
-  return req.user?.language || 'ja-JP';
+  return (req.user && req.user.lang) || 'ja-JP';
 }
 
-// =============================
 // 翻訳辞書（UI多言語）
-// =============================
 function t(key, lang = 'ja-JP') {
   const ja = {
     appTitle: 'sententia',
@@ -155,7 +155,7 @@ function t(key, lang = 'ja-JP') {
     versionHistory: 'バージョン履歴',
     profile: 'プロフィール',
     reply: '返信',
-    back: '戻る',
+    back: '戻る'
   };
 
   const en = {
@@ -176,7 +176,7 @@ function t(key, lang = 'ja-JP') {
     versionHistory: 'Version history',
     profile: 'Profile',
     reply: 'Reply',
-    back: 'Back',
+    back: 'Back'
   };
 
   const dict = lang === 'en-US' ? en : ja;
@@ -191,11 +191,11 @@ function ensureAuthenticated(req, res, next) {
   return res.redirect('/login-modal');
 }
 
-// ロゴ真ん中＋左右にボタンの共通ヘッダー
+// 共通ヘッダー（ロゴ中央 / 左にプロフィール＋設定 / 右にログインorログアウト）
 function renderHeader(user, opts = {}) {
+  const lang = user?.lang || 'ja-JP';
   const showProfileIcon = opts.showProfileIcon !== false;
 
-  // 左上：プロフィールボタン → 設定ボタン の順に並べる
   let leftHtml = '';
   if (user) {
     const profileButton = showProfileIcon
@@ -281,7 +281,7 @@ function renderHeader(user, opts = {}) {
   <div class="absolute right-4 top-3 flex items-center gap-3">
     <button onclick="location.href='/login-modal'"
             class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-      ${t("login", lang)}
+      ${t('login', lang)}
     </button>
   </div>
   `;
@@ -318,6 +318,7 @@ app.get(
 app.get('/login-modal', (req, res) => {
   const lang = getLang(req);
   const _t = (key) => t(key, lang);
+
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -336,7 +337,7 @@ app.get('/login-modal', (req, res) => {
   <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative mt-20">
     <button onclick="location.href='/'"
             class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
-    <h2 class="text-2xl font-bold text-center mb-6">>${_t('login')}</h2>
+    <h2 class="text-2xl font-bold text-center mb-6">${_t('login')}</h2>
 
     <form action="/login" method="POST" class="mb-4">
       <input type="text" name="username" placeholder="ユーザー名" maxlength="20" required
@@ -367,8 +368,6 @@ app.get('/login-modal', (req, res) => {
 // サインアップ画面
 // =============================
 app.get('/signup', (req, res) => {
-  const lang = getLang(req);
-  const _t = (key) => t(key, lang);
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -469,8 +468,6 @@ app.get('/signup', (req, res) => {
 // =============================
 app.post('/signup', async (req, res) => {
   try {
-    const lang = getLang(req);
-    const _t = (key) => t(key, lang);
     const { username, password } = req.body;
     let { handle } = req.body;
 
@@ -566,13 +563,14 @@ app.post('/login', async (req, res) => {
 // 設定画面
 // =============================
 app.get('/settings', ensureAuthenticated, (req, res) => {
-  const lang = getLang(req);
-  const _t = (key) => t(key, lang);
   const user = req.user;
-  const header = renderHeader(user, { showProfileIcon: true });
+  const lang = getLang(req);
+  const locale = user.lang || 'ja-JP';
   const theme = user.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
-  const locale = user.lang || 'ja-JP';
+
+  const header = renderHeader(user, { showProfileIcon: true });
+
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -581,45 +579,32 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-  /* ===============================
-     Dark Mode Global
-     =============================== */
   .dark-mode {
-    background-color: #0d1117; /* ← 背景を Twitter/X の暗色より更に暗く */
+    background-color: #0d1117;
     color: #e5e7eb;
   }
-
-  /* 投稿カード（背景） */
   .dark-mode .post-card,
   .dark-mode .bg-white {
-    background-color: #1a1f28;  /* ← 背景より少しだけ明るい濃灰 */
+    background-color: #1a1f28;
     color: #f3f4f6;
   }
-
-  /* 入力欄（検索ボックスやコメント欄） */
   .dark-mode input[type="text"],
   .dark-mode textarea,
   .dark-mode .search-box {
-    background-color: #1a1f28; /* 投稿カードと同じ色 */
+    background-color: #1a1f28;
     border-color: #374151;
     color: #e5e7eb;
   }
-
-  /* 薄い文字 */
   .dark-mode .text-gray-500 {
     color: #9ca3af;
   }
-
-  /* アイコン・枠の色 */
   .dark-mode .border-gray-300 {
     border-color: #4b5563;
   }
-
-  /* 影は暗色では弱める */
   .dark-mode .shadow-md {
     box-shadow: none;
   }
-</style>
+  </style>
 </head>
 <body class="${themeClass} min-h-screen">
   ${header}
@@ -689,7 +674,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
     <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
       <button onclick="document.getElementById('lang-settings').classList.toggle('hidden')"
               class="w-full flex items-center justify-between text-left">
-        <span class="font-semibold text-lg">言語 / 地域</span>
+        <span class="font-semibold text-lg">${t('languageSettings', locale)}</span>
         <span class="text-gray-400 text-xl">▼</span>
       </button>
 
@@ -714,7 +699,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
         </button>
       </form>
     </div>
-    
+
     <!-- バージョン履歴 -->
     <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
       <button onclick="document.getElementById('version-history').classList.toggle('hidden')"
@@ -771,7 +756,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
   <script>
     (function () {
       const theme = '${theme}';
-      if (theme !== 'system') return;  // system 以外のときは何もしない
+      if (theme !== 'system') return;
 
       const body = document.body;
 
@@ -786,10 +771,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
         }
       }
 
-      // 初回適用
       applySystemTheme();
-
-      // OS テーマ変更にも追従
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
       mq.addEventListener('change', applySystemTheme);
     })();
@@ -798,6 +780,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
 </html>`);
 });
 
+// テーマ更新
 app.post('/settings/theme', ensureAuthenticated, async (req, res) => {
   const userId = req.user.id;
   const theme = req.body.theme;
@@ -821,7 +804,6 @@ app.post('/settings/theme', ensureAuthenticated, async (req, res) => {
     );
   }
 
-  // 最新のユーザー情報を取り直してセッションに反映
   const { data: updatedUser } = await supabase
     .from('users')
     .select('*')
@@ -835,17 +817,17 @@ app.post('/settings/theme', ensureAuthenticated, async (req, res) => {
   });
 });
 
+// 言語 / 地域更新
 app.post('/settings/lang', ensureAuthenticated, async (req, res) => {
   const userId = req.user.id;
   const { langRegion } = req.body;
 
-  // デフォルト
   let lang = 'ja-JP';
   let time_zone = 'Asia/Tokyo';
 
   if (langRegion === 'us') {
     lang = 'en-US';
-    time_zone = 'America/Los_Angeles'; // 好きなアメリカのTZに変えてOK
+    time_zone = 'America/Los_Angeles';
   }
 
   const { error } = await supabase
@@ -860,7 +842,6 @@ app.post('/settings/lang', ensureAuthenticated, async (req, res) => {
     );
   }
 
-  // 新しいユーザー情報でセッション更新
   const { data: updatedUser } = await supabase
     .from('users')
     .select('*')
@@ -882,20 +863,22 @@ app.get('/me', ensureAuthenticated, (req, res) => {
 });
 
 app.get('/profile/:id', async (req, res) => {
-  const lang = getLang(req);
-  const _t = (key) => t(key, lang);
-  const profileUserId = req.params.id;
   const viewer = req.user;
+  const lang = getLang(req);
   const theme = viewer?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
   const locale = viewer?.lang || 'ja-JP';
   const timeZone = viewer?.time_zone || 'Asia/Tokyo';
+
   function formatTime(dateStr, opts = {}) {
     return new Date(dateStr).toLocaleString(locale, {
       timeZone,
       ...opts
     });
   }
+
+  const profileUserId = req.params.id;
+
   const { data: profileUser, error: userError } = await supabase
     .from('users')
     .select('*')
@@ -986,22 +969,12 @@ app.get('/profile/:id', async (req, res) => {
                 }">
                   ${p.type === 'company' ? '企業' : '物事'}
                 </span>
-              
-              // メインの投稿カード
-              <span class="text-gray-500 text-sm">
-                ${formatTime(p.time, {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </span>
-
-              // いいねタブの投稿 / 返信の小さい時間表示
-              <span class="text-[11px] text-gray-400">
-                ${formatTime(r.time, {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
-              </span>
+                <span>
+                  ${formatTime(p.time, {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
               </div>
             </div>
             <p class="mt-2 text-sm whitespace-pre-wrap break-words">${p.text}</p>
@@ -1035,7 +1008,7 @@ app.get('/profile/:id', async (req, res) => {
 
   const postsHtml =
     userPosts.length === 0
-      ? '<p class="text-gray-500 text-sm">${t("noPosts", locale)}</p>'
+      ? `<p class="text-gray-500 text-sm">${t('noPosts', locale)}</p>`
       : userPosts.map((p) => renderPostCard(p)).join('');
 
   const likesHtml =
@@ -1051,45 +1024,32 @@ app.get('/profile/:id', async (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-  /* ===============================
-     Dark Mode Global
-     =============================== */
   .dark-mode {
-    background-color: #0d1117; /* ← 背景を Twitter/X の暗色より更に暗く */
+    background-color: #0d1117;
     color: #e5e7eb;
   }
-
-  /* 投稿カード（背景） */
   .dark-mode .post-card,
   .dark-mode .bg-white {
-    background-color: #1a1f28;  /* ← 背景より少しだけ明るい濃灰 */
+    background-color: #1a1f28;
     color: #f3f4f6;
   }
-
-  /* 入力欄（検索ボックスやコメント欄） */
   .dark-mode input[type="text"],
   .dark-mode textarea,
   .dark-mode .search-box {
-    background-color: #1a1f28; /* 投稿カードと同じ色 */
+    background-color: #1a1f28;
     border-color: #374151;
     color: #e5e7eb;
   }
-
-  /* 薄い文字 */
   .dark-mode .text-gray-500 {
     color: #9ca3af;
   }
-
-  /* アイコン・枠の色 */
   .dark-mode .border-gray-300 {
     border-color: #4b5563;
   }
-
-  /* 影は暗色では弱める */
   .dark-mode .shadow-md {
     box-shadow: none;
   }
-</style>
+  </style>
 </head>
 <body class="${themeClass} min-h-screen">
   ${header}
@@ -1164,14 +1124,7 @@ app.get('/profile/:id', async (req, res) => {
         alert('ネットワークエラーが発生しました。');
       }
     }
-  </script>
-  <script>
-    function showTab(tab) { ... }
 
-    async function handleLike(postId) { ... }
-  </script>
-
-  <script>
     (function () {
       const theme = '${theme}';
       if (theme !== 'system') return;
@@ -1190,7 +1143,6 @@ app.get('/profile/:id', async (req, res) => {
       }
 
       applySystemTheme();
-
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
       mq.addEventListener('change', applySystemTheme);
     })();
@@ -1198,24 +1150,27 @@ app.get('/profile/:id', async (req, res) => {
 </body>
 </html>`);
 });
+
 // =============================
 // 投稿詳細ページ
 // =============================
 app.get('/post/:id', async (req, res) => {
-  const postId = req.params.id;
   const viewer = req.user;
   const theme = viewer?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
   const header = renderHeader(viewer, { showProfileIcon: true });
   const locale = viewer?.lang || 'ja-JP';
   const timeZone = viewer?.time_zone || 'Asia/Tokyo';
+
   function formatTime(dateStr, opts = {}) {
     return new Date(dateStr).toLocaleString(locale, {
       timeZone,
       ...opts
     });
   }
-  // 対象の投稿本体
+
+  const postId = req.params.id;
+
   const { data: post, error: postError } = await supabase
     .from('posts')
     .select(
@@ -1228,7 +1183,6 @@ app.get('/post/:id', async (req, res) => {
     return res.send('<h1>投稿が見つかりませんでした。</h1>');
   }
 
-  // その投稿への返信一覧
   const { data: repliesData } = await supabase
     .from('posts')
     .select(
@@ -1239,7 +1193,6 @@ app.get('/post/:id', async (req, res) => {
 
   const replies = repliesData || [];
 
-  // いいね情報
   const allIds = [post.id, ...replies.map((r) => r.id)];
   const likesMap = {};
 
@@ -1432,17 +1385,16 @@ app.get('/post/:id', async (req, res) => {
 
   <div class="max-w-2xl mx-auto pt-32 pb-16 px-4">
     <button onclick="history.back()"
-            class="text-sm text-blue-500 hover:underline mb-4">&larr; 戻る</button>
+            class="text-sm text-blue-500 hover:underline mb-4">&larr; ${t('back', lang)}</button>
 
     ${renderMainPost(post)}
 
-    <h2 class="text-sm font-semibold mb-2">返信</h2>
+    <h2 class="text-sm font-semibold mb-2">${t('replies', lang)}</h2>
     <div class="space-y-2">
       ${repliesHtml}
     </div>
   </div>
 
-  <!-- 返信用モーダル（ホームと共通で使うならそのまま or 簡略版でもOK） -->
   <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
       <button onclick="closePostModal()"
@@ -1524,22 +1476,24 @@ app.get('/post/:id', async (req, res) => {
 // ホーム
 // =============================
 app.get('/', async (req, res) => {
-  const lang = getLang(req);
-  const _t = (key) => t(key, lang);
   const user = req.user;
-  const search = (req.query.q || '').trim();
-  const replyTo = req.query.replyTo || '';
-  const theme = user?.theme || 'system';
-  const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
+  const lang = getLang(req);
   const locale = user?.lang || 'ja-JP';
   const timeZone = user?.time_zone || 'Asia/Tokyo';
+
   function formatTime(dateStr, opts = {}) {
     return new Date(dateStr).toLocaleString(locale, {
       timeZone,
       ...opts
     });
   }
+
+  const search = (req.query.q || '').trim();
+  const replyTo = req.query.replyTo || '';
+  const theme = user?.theme || 'system';
+  const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
   const header = renderHeader(user, { showProfileIcon: true });
+
   let postsQuery = supabase
     .from('posts')
     .select(
@@ -1587,7 +1541,7 @@ app.get('/', async (req, res) => {
       repliesByParent[p.parent_post_id].push(p);
     });
 
-    function renderPostCard(p, replies) {
+  function renderPostCard(p, replies) {
     const likeInfo = likesMap[p.id] || {
       count: 0,
       likedByUser: false
@@ -1607,7 +1561,6 @@ app.get('/', async (req, res) => {
           </button>
 
           <div class="flex-1">
-            <!-- 全体クリックで詳細ページへ -->
             <button type="button"
                     onclick="location.href='/post/${p.id}'"
                     class="w-full text-left">
@@ -1662,7 +1615,7 @@ app.get('/', async (req, res) => {
 
   const postsHtml =
     topPosts.length === 0
-      ? '<p class="text-gray-500">まだ投稿がありません。</p>'
+      ? `<p class="text-gray-500">${t('noPosts', locale)}</p>`
       : topPosts
           .map((p) => renderPostCard(p, repliesByParent[p.id] || []))
           .join('');
@@ -1679,45 +1632,32 @@ app.get('/', async (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-  /* ===============================
-     Dark Mode Global
-     =============================== */
   .dark-mode {
-    background-color: #0d1117; /* ← 背景を Twitter/X の暗色より更に暗く */
+    background-color: #0d1117;
     color: #e5e7eb;
   }
-
-  /* 投稿カード（背景） */
   .dark-mode .post-card,
   .dark-mode .bg-white {
-    background-color: #1a1f28;  /* ← 背景より少しだけ明るい濃灰 */
+    background-color: #1a1f28;
     color: #f3f4f6;
   }
-
-  /* 入力欄（検索ボックスやコメント欄） */
   .dark-mode input[type="text"],
   .dark-mode textarea,
   .dark-mode .search-box {
-    background-color: #1a1f28; /* 投稿カードと同じ色 */
+    background-color: #1a1f28;
     border-color: #374151;
     color: #e5e7eb;
   }
-
-  /* 薄い文字 */
   .dark-mode .text-gray-500 {
     color: #9ca3af;
   }
-
-  /* アイコン・枠の色 */
   .dark-mode .border-gray-300 {
     border-color: #4b5563;
   }
-
-  /* 影は暗色では弱める */
   .dark-mode .shadow-md {
     box-shadow: none;
   }
-</style>
+  </style>
 </head>
 <body class="${themeClass} min-h-screen">
   ${header}
@@ -1736,7 +1676,7 @@ app.get('/', async (req, res) => {
       </form>
     </div>
 
-    <h2 class="text-2xl font-bold mb-6">>${t('recentTopics', locale)}</h2>
+    <h2 class="text-2xl font-bold mb-6">${t('recentTopics', locale)}</h2>
     <div class="space-y-4">
       ${postsHtml}
     </div>
@@ -1797,7 +1737,6 @@ app.get('/', async (req, res) => {
   </div>
 
   <script>
-    // 投稿モーダル
     function openPostModal(parentId) {
       const modal = document.getElementById('modal');
       const input = document.getElementById('parent_post_id_input');
@@ -1810,10 +1749,8 @@ app.get('/', async (req, res) => {
       document.getElementById('parent_post_id_input').value = '';
     }
 
-    // 返信用スクリプト（サーバー側で埋め込まれている）
     ${replyToScript}
 
-    // いいね
     async function handleLike(postId) {
       try {
         const res = await fetch('/like/' + postId, { method: 'POST' });
@@ -1826,35 +1763,33 @@ app.get('/', async (req, res) => {
         alert('ネットワークエラーが発生しました。');
       }
     }
-  (function () {
-    const theme = '${theme}';
-    if (theme !== 'system') return;
 
-    const body = document.body;
+    (function () {
+      const theme = '${theme}';
+      if (theme !== 'system') return;
 
-    function applySystemTheme() {
-      const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (dark) {
-        body.classList.add('dark-mode');
-        body.classList.remove('bg-gray-100');
-      } else {
-        body.classList.remove('dark-mode');
-        body.classList.add('bg-gray-100');
+      const body = document.body;
+
+      function applySystemTheme() {
+        const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (dark) {
+          body.classList.add('dark-mode');
+          body.classList.remove('bg-gray-100');
+        } else {
+          body.classList.remove('dark-mode');
+          body.classList.add('bg-gray-100');
+        }
       }
-    }
 
-    // 初回適用
-    applySystemTheme();
-
-    // OS が切り替わったら反映
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    mq.addEventListener('change', applySystemTheme);
-  })();
+      applySystemTheme();
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      mq.addEventListener('change', applySystemTheme);
+    })();
   </script>
-  </body>
-  </html>`);
-  });
- 
+</body>
+</html>`);
+});
+
 // =============================
 // ログアウト
 // =============================
@@ -1897,9 +1832,7 @@ app.post('/post', ensureAuthenticated, async (req, res) => {
     );
   }
 
-  res.send(
-    '<script>alert("投稿完了！"); location.href = "/";</script>'
-  );
+  res.send('<script>alert("投稿完了！"); location.href = "/";</script>');
 });
 
 // =============================
