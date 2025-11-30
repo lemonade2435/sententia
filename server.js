@@ -138,27 +138,81 @@ function ensureAuthenticated(req, res, next) {
 function renderHeader(user, opts = {}) {
   const showProfileIcon = opts.showProfileIcon !== false;
 
-  const leftHtml =
-    user && showProfileIcon
+  // 左上：プロフィールボタン → 設定ボタン の順に並べる
+  let leftHtml = '';
+  if (user) {
+    const profileButton = showProfileIcon
       ? `
-  <div class="absolute left-4 top-3">
     <button onclick="location.href='/me'"
             class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
       <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
       </svg>
     </button>
-  </div>
-  `
+    `
       : '';
 
+    const settingsButton = `
+    <button onclick="location.href='/settings'"
+            class="w-10 h-10 rounded-full border bg-white flex items-center justify-center hover:bg-gray-50">
+      <svg viewBox="0 0 24 24" class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="
+          M19.4 12
+          a7.4 7.4 0 0 0-.1-1
+          l2-1.6
+          a0.7 0.7 0 0 0 .1-0.9
+          l-1.9-3.3
+          a0.7 0.7 0 0 0-.8-0.3
+          l-2.3.9
+          a7.4 7.4 0 0 0-1.7-1
+          l-.3-2.4
+          a0.7 0.7 0 0 0-.7-0.6
+          h-3.8
+          a0.7 0.7 0 0 0-.7.6
+          l-.3 2.4
+          a7.4 7.4 0 0 0-1.7 1
+          l-2.3-.9
+          a0.7 0.7 0 0 0-.8.3
+          l-1.9 3.3
+          a0.7 0.7 0 0 0 .1.9
+          l2 1.6
+          a7.4 7.4 0 0 0 0 2
+          l-2 1.6
+          a0.7 0.7 0 0 0-.1.9
+          l1.9 3.3
+          a0.7 0.7 0 0 0 .8.3
+          l2.3-.9
+          a7.4 7.4 0 0 0 1.7 1
+          l.3 2.4
+          a0.7 0.7 0 0 0 .7.6
+          h3.8
+          a0.7 0.7 0 0 0 .7-.6
+          l.3-2.4
+          a7.4 7.4 0 0 0 1.7-1
+          l2.3.9
+          a0.7 0.7 0 0 0 .8-.3
+          l1.9-3.3
+          a0.7 0.7 0 0 0-.1-.9
+          l-2-1.6
+          a7.4 7.4 0 0 0 .1-1
+        "></path>
+      </svg>
+    </button>
+    `;
+
+    leftHtml = `
+  <div class="absolute left-4 top-3 flex items-center gap-2">
+    ${profileButton}
+    ${settingsButton}
+  </div>
+  `;
+  }
+
+  // 右上：Log in / Log out
   const rightHtml = user
     ? `
   <div class="absolute right-4 top-3 flex items-center gap-3">
-    <button onclick="location.href='/settings'"
-            class="w-10 h-10 rounded-full border bg-white flex items-center justify-center text-xl hover:bg-gray-50">
-      ⚙️
-    </button>
     <form action="/logout" method="POST">
       <button type="submit"
               class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
@@ -176,11 +230,13 @@ function renderHeader(user, opts = {}) {
   </div>
   `;
 
+  // ロゴ（中央）
   return `
 <div class="fixed top-0 left-0 right-0 z-40 pt-0 flex justify-center">
   <button onclick="location.href='/'" class="flex items-center -mt-3">
     <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
   </button>
+
   ${leftHtml}
   ${rightHtml}
 </div>
