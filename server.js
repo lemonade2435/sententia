@@ -1288,6 +1288,7 @@ app.get('/', async (req, res) => {
   </div>
 
   <script>
+    // 投稿モーダル
     function openPostModal(parentId) {
       const modal = document.getElementById('modal');
       const input = document.getElementById('parent_post_id_input');
@@ -1300,8 +1301,10 @@ app.get('/', async (req, res) => {
       document.getElementById('parent_post_id_input').value = '';
     }
 
+    // 返信用スクリプト（サーバー側で埋め込まれている）
     ${replyToScript}
 
+    // いいね
     async function handleLike(postId) {
       try {
         const res = await fetch('/like/' + postId, { method: 'POST' });
@@ -1314,40 +1317,43 @@ app.get('/', async (req, res) => {
         alert('ネットワークエラーが発生しました。');
       }
     }
-<script>
-  (function () {
-    const theme = "{{theme}}";  // ← EJS/Handlebars/JS テンプレの安全な書き方
-    const body = document.body;
 
-    function applyTheme() {
-      if (theme === "dark") {
-        body.classList.add("dark-mode");
-        body.classList.remove("light-mode");
-      } else if (theme === "light") {
-        body.classList.add("light-mode");
-        body.classList.remove("dark-mode");
-      } else {
-        // system
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        if (prefersDark) {
-          body.classList.add("dark-mode");
-          body.classList.remove("light-mode");
+    // テーマ適用（light / dark / system）
+    (function () {
+      const theme = '${theme}';  // ← ここは ${theme} にする
+      const body = document.body;
+
+      function applyTheme() {
+        if (theme === 'dark') {
+          body.classList.add('dark-mode');
+          body.classList.remove('bg-gray-100');
+        } else if (theme === 'light') {
+          body.classList.remove('dark-mode');
+          body.classList.add('bg-gray-100');
         } else {
-          body.classList.add("light-mode");
-          body.classList.remove("dark-mode");
+          // system
+          const prefersDark =
+            window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (prefersDark) {
+            body.classList.add('dark-mode');
+            body.classList.remove('bg-gray-100');
+          } else {
+            body.classList.remove('dark-mode');
+            body.classList.add('bg-gray-100');
+          }
         }
       }
-    }
 
-    applyTheme();
+      applyTheme();
 
-    if (theme === "system") {
-      const mq = window.matchMedia("(prefers-color-scheme: dark)");
-      mq.addEventListener("change", applyTheme);
-    }
-  })();
-</script>
-
+      if (theme === 'system' && window.matchMedia) {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        mq.addEventListener('change', applyTheme);
+      }
+    })();
+  </script>
+ 
 // =============================
 // ログアウト
 // =============================
