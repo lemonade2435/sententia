@@ -125,6 +125,14 @@ passport.deserializeUser(async (id, done) => {
   if (error) return done(error);
   done(null, user);
 });
+
+// =============================
+// 言語をユーザーから取得（未設定ならja-JP）
+// =============================
+function getLang(req) {
+  return req.user?.language || 'ja-JP';
+}
+
 // =============================
 // 翻訳辞書（UI多言語）
 // =============================
@@ -308,7 +316,8 @@ app.get(
 // ログインモーダル
 // =============================
 app.get('/login-modal', (req, res) => {
-  const lang = req.user?.lang || 'ja';
+  const lang = getLang(req);
+  const _t = (key) => t(key, lang);
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -327,7 +336,7 @@ app.get('/login-modal', (req, res) => {
   <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative mt-20">
     <button onclick="location.href='/'"
             class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
-    <h2 class="text-2xl font-bold text-center mb-6">ログインする</h2>
+    <h2 class="text-2xl font-bold text-center mb-6">>${_t('login')}</h2>
 
     <form action="/login" method="POST" class="mb-4">
       <input type="text" name="username" placeholder="ユーザー名" maxlength="20" required
@@ -358,7 +367,8 @@ app.get('/login-modal', (req, res) => {
 // サインアップ画面
 // =============================
 app.get('/signup', (req, res) => {
-  const lang = req.user?.lang || 'ja';
+  const lang = getLang(req);
+  const _t = (key) => t(key, lang);
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -459,7 +469,8 @@ app.get('/signup', (req, res) => {
 // =============================
 app.post('/signup', async (req, res) => {
   try {
-    const lang = req.user?.lang || 'ja';
+    const lang = getLang(req);
+    const _t = (key) => t(key, lang);
     const { username, password } = req.body;
     let { handle } = req.body;
 
@@ -555,7 +566,8 @@ app.post('/login', async (req, res) => {
 // 設定画面
 // =============================
 app.get('/settings', ensureAuthenticated, (req, res) => {
-  const lang = req.user?.lang || 'ja';
+  const lang = getLang(req);
+  const _t = (key) => t(key, lang);
   const user = req.user;
   const header = renderHeader(user, { showProfileIcon: true });
   const theme = user.theme || 'system';
@@ -870,7 +882,8 @@ app.get('/me', ensureAuthenticated, (req, res) => {
 });
 
 app.get('/profile/:id', async (req, res) => {
-  const lang = req.user?.lang || 'ja';
+  const lang = getLang(req);
+  const _t = (key) => t(key, lang);
   const profileUserId = req.params.id;
   const viewer = req.user;
   const theme = viewer?.theme || 'system';
@@ -1511,7 +1524,8 @@ app.get('/post/:id', async (req, res) => {
 // ホーム
 // =============================
 app.get('/', async (req, res) => {
-  const lang = req.user?.lang || 'ja';
+  const lang = getLang(req);
+  const _t = (key) => t(key, lang);
   const user = req.user;
   const search = (req.query.q || '').trim();
   const replyTo = req.query.replyTo || '';
