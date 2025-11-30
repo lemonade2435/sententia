@@ -308,6 +308,7 @@ app.get(
 // ログインモーダル
 // =============================
 app.get('/login-modal', (req, res) => {
+  const lang = req.user?.lang || 'ja';
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -357,6 +358,7 @@ app.get('/login-modal', (req, res) => {
 // サインアップ画面
 // =============================
 app.get('/signup', (req, res) => {
+  const lang = req.user?.lang || 'ja';
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -869,6 +871,7 @@ app.get('/me', ensureAuthenticated, (req, res) => {
 
 app.get('/profile/:id', async (req, res) => {
   const lang = req.user?.lang || 'ja';
+  const t = getTranslator(lang);
   const profileUserId = req.params.id;
   const viewer = req.user;
   const theme = viewer?.theme || 'system';
@@ -1510,6 +1513,7 @@ app.get('/post/:id', async (req, res) => {
 // =============================
 app.get('/', async (req, res) => {
   const lang = req.user?.lang || 'ja';
+  const t = getTranslator(lang);
   const user = req.user;
   const search = (req.query.q || '').trim();
   const replyTo = req.query.replyTo || '';
