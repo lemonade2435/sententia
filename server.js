@@ -552,6 +552,7 @@ app.post('/login', async (req, res) => {
 // 設定画面
 // =============================
 app.get('/settings', ensureAuthenticated, (req, res) => {
+  const lang = req.user?.lang || 'ja';
   const user = req.user;
   const header = renderHeader(user, { showProfileIcon: true });
   const theme = user.theme || 'system';
@@ -866,6 +867,7 @@ app.get('/me', ensureAuthenticated, (req, res) => {
 });
 
 app.get('/profile/:id', async (req, res) => {
+  const lang = req.user?.lang || 'ja';
   const profileUserId = req.params.id;
   const viewer = req.user;
   const theme = viewer?.theme || 'system';
@@ -1506,6 +1508,7 @@ app.get('/post/:id', async (req, res) => {
 // ホーム
 // =============================
 app.get('/', async (req, res) => {
+  const lang = req.user?.lang || 'ja';
   const user = req.user;
   const search = (req.query.q || '').trim();
   const replyTo = req.query.replyTo || '';
