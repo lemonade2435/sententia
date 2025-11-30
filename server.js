@@ -709,6 +709,14 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
       </button>
 
       <div id="version-history" class="mt-4 hidden text-sm text-gray-700 space-y-4">
+         <div>
+          <p class="font-semibold">v1.0.7 (beta)</p>
+          <ul class="list-disc list-inside">
+            <li>ダークモード、システム同期追加</li>
+            <li>投稿詳細追加</li>
+            <li>言語設定追加</li>
+          </ul>
+        </div>
         <div>
           <p class="font-semibold">v1.0.6 (beta)</p>
           <ul class="list-disc list-inside">
