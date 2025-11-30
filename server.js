@@ -1315,41 +1315,38 @@ app.get('/', async (req, res) => {
       }
     }
      <script>
-    (function () {
-      const theme = '${theme}'; // ← サーバーから渡された light/dark/system
-      const body = document.body;
+  (function () {
+    const theme = "{{theme}}";  // ← EJS/Handlebars/JS テンプレの安全な書き方
+    const body = document.body;
 
-      function applyTheme() {
-        if (theme === 'dark') {
-          body.classList.add('dark-mode');
-          body.classList.remove('bg-gray-100');
-        } else if (theme === 'light') {
-          body.classList.remove('dark-mode');
-          body.classList.add('bg-gray-100');
+    function applyTheme() {
+      if (theme === "dark") {
+        body.classList.add("dark-mode");
+        body.classList.remove("light-mode");
+      } else if (theme === "light") {
+        body.classList.add("light-mode");
+        body.classList.remove("dark-mode");
+      } else {
+        // system
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (prefersDark) {
+          body.classList.add("dark-mode");
+          body.classList.remove("light-mode");
         } else {
-          // system → OSの設定に合わせる
-          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            body.classList.add('dark-mode');
-            body.classList.remove('bg-gray-100');
-          } else {
-            body.classList.remove('dark-mode');
-            body.classList.add('bg-gray-100');
-          }
+          body.classList.add("light-mode");
+          body.classList.remove("dark-mode");
         }
       }
+    }
 
-      applyTheme();
+    applyTheme();
 
-      // systemのときは、OSテーマ変更にも追従したければここで監視
-      if (theme === 'system' && window.matchMedia) {
-        const mq = window.matchMedia('(prefers-color-scheme: dark)');
-        mq.addEventListener('change', applyTheme);
-      }
-    })();
-  </script>
-</body>
-</html>`);
-});
+    if (theme === "system") {
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      mq.addEventListener("change", applyTheme);
+    }
+  })();
+</script>
 
 // =============================
 // ログアウト
