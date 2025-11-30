@@ -507,6 +507,7 @@ app.post('/login', async (req, res) => {
 app.get('/settings', ensureAuthenticated, (req, res) => {
   const user = req.user;
   const header = renderHeader(user, { showProfileIcon: true });
+  const theme = user.theme || 'system';
 
   res.send(`<!DOCTYPE html>
 <html lang="ja">
@@ -521,6 +522,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
   <div class="max-w-xl mx-auto pt-32 pb-16 px-4">
     <h1 class="text-2xl font-bold mb-6">設定</h1>
 
+    <!-- ユーザー情報 -->
     <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
       <button onclick="document.getElementById('user-info-form').classList.toggle('hidden')"
               class="w-full flex items-center justify-between text-left">
@@ -546,47 +548,119 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
         </button>
       </form>
     </div>
+
+    <!-- 画面設定（テーマ） -->
+    <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
+      <button onclick="document.getElementById('display-settings').classList.toggle('hidden')"
+              class="w-full flex items-center justify-between text-left">
+        <span class="font-semibold text-lg">画面設定</span>
+        <span class="text-gray-400 text-xl">▼</span>
+      </button>
+
+      <form id="display-settings" action="/settings/theme" method="POST" class="mt-4 hidden">
+        <p class="mb-3 text-sm text-gray-600">テーマ</p>
+        <div class="space-y-2 mb-4 text-sm">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="theme" value="light" ${theme === 'light' ? 'checked' : ''}>
+            <span>ライト</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="theme" value="dark" ${theme === 'dark' ? 'checked' : ''}>
+            <span>ダーク</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="theme" value="system" ${theme === 'system' ? 'checked' : ''}>
+            <span>システム設定に合わせる</span>
+          </label>
+        </div>
+
+        <button type="submit"
+                class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-full font-semibold">
+          保存
+        </button>
+      </form>
+    </div>
+
+    <!-- バージョン履歴 -->
+    <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
+      <button onclick="document.getElementById('version-history').classList.toggle('hidden')"
+              class="w-full flex items-center justify-between text-left">
+        <span class="font-semibold text-lg">バージョン履歴</span>
+        <span class="text-gray-400 text-xl">▼</span>
+      </button>
+
+      <div id="version-history" class="mt-4 hidden text-sm text-gray-700 space-y-4">
+        <div>
+          <p class="font-semibold">v1.0.6 (beta)</p>
+          <ul class="list-disc list-inside">
+            <li>いいね、返信機能追加</li>
+            <li>ロゴ作成</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-semibold">v1.0.5 (beta)</p>
+          <ul class="list-disc list-inside">
+            <li>プロフィール追加</li>
+            <li>設定追加</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-semibold">v1.0.4 (beta)</p>
+          <ul class="list-disc list-inside">
+            <li>ログイン機能追加</li>
+            <li>Googleアカウント連携</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-semibold">v1.0.3 (beta)</p>
+          <ul class="list-disc list-inside">
+            <li>データ保存機能追加</li>
+            <li>検索機能追加</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-semibold">v1.0.2 (beta)</p>
+          <ul class="list-disc list-inside">
+            <li>ホーム追加</li>
+          </ul>
+        </div>
+        <div>
+          <p class="font-semibold">v1.0.1 (beta)</p>
+          <ul class="list-disc list-inside">
+            <li>投稿機能追加</li>
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
 </body>
 </html>`);
 });
 
-app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
-  const { username } = req.body;
-  let { handle } = req.body;
+app.post('/settings/theme', ensureAuthenticated, async (req, res) => {
   const userId = req.user.id;
+  const theme = req.body.theme;
 
-  if (!username || username.length < 1 || username.length > 20) {
+  const allowed = ['light', 'dark', 'system'];
+  if (!allowed.includes(theme)) {
     return res.send(
-      '<script>alert("ユーザー名は1〜20文字で入力してください。"); history.back();</script>'
+      '<script>alert("不正なテーマが指定されました。"); history.back();</script>'
     );
-  }
-
-  if (handle) {
-    handle = handle.trim();
-    if (!handle.startsWith('@')) handle = '@' + handle;
-    if (handle.length > 20) {
-      return res.send(
-        '<script>alert("ユーザーID（@〜）は20文字以内で入力してください。"); history.back();</script>'
-      );
-    }
-  } else {
-    handle = null;
   }
 
   const { error } = await supabase
     .from('users')
-    .update({ username, handle })
+    .update({ theme })
     .eq('id', userId);
 
   if (error) {
+    console.error('Theme update error:', error);
     return res.send(
-      '<script>alert("更新エラー: ' +
-        error.message +
-        '"); history.back();</script>'
+      '<script>alert("テーマの更新中にエラーが発生しました。"); history.back();</script>'
     );
   }
 
+  // 最新のユーザー情報を取り直してセッションに反映
   const { data: updatedUser } = await supabase
     .from('users')
     .select('*')
@@ -595,7 +669,7 @@ app.post('/settings/profile', ensureAuthenticated, async (req, res) => {
 
   req.login(updatedUser, () => {
     res.send(
-      '<script>alert("更新しました。"); location.href="/settings";</script>'
+      '<script>alert("テーマを保存しました。"); location.href="/settings";</script>'
     );
   });
 });
