@@ -125,6 +125,55 @@ passport.deserializeUser(async (id, done) => {
   if (error) return done(error);
   done(null, user);
 });
+// =============================
+// 翻訳辞書（UI多言語）
+// =============================
+function t(key, lang = 'ja-JP') {
+  const ja = {
+    appTitle: 'sententia',
+    recentTopics: '最近のトピック',
+    searchPlaceholder: 'キーワードで検索',
+    login: 'ログイン',
+    logout: 'ログアウト',
+    signup: 'アカウントを作成',
+    postButton: '投稿する',
+    noPosts: 'まだ投稿がありません。',
+    replies: '返信',
+    settings: '設定',
+    userInfo: 'ユーザー情報',
+    displaySettings: '画面設定',
+    languageSettings: '言語 / 地域',
+    themeSettings: 'テーマ',
+    versionHistory: 'バージョン履歴',
+    profile: 'プロフィール',
+    reply: '返信',
+    back: '戻る',
+  };
+
+  const en = {
+    appTitle: 'sententia',
+    recentTopics: 'Recent topics',
+    searchPlaceholder: 'Search by keyword',
+    login: 'Log in',
+    logout: 'Log out',
+    signup: 'Sign up',
+    postButton: 'Post',
+    noPosts: 'No posts yet.',
+    replies: 'Replies',
+    settings: 'Settings',
+    userInfo: 'User info',
+    displaySettings: 'Display settings',
+    languageSettings: 'Language / Region',
+    themeSettings: 'Theme',
+    versionHistory: 'Version history',
+    profile: 'Profile',
+    reply: 'Reply',
+    back: 'Back',
+  };
+
+  const dict = lang === 'en-US' ? en : ja;
+  return dict[key] || key;
+}
 
 // =============================
 // 共通ヘルパー
@@ -209,14 +258,13 @@ function renderHeader(user, opts = {}) {
   `;
   }
 
-  // 右上：Log in / Log out
   const rightHtml = user
     ? `
   <div class="absolute right-4 top-3 flex items-center gap-3">
     <form action="/logout" method="POST">
       <button type="submit"
               class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-        Log out
+        ${t('logout', lang)}
       </button>
     </form>
   </div>
@@ -225,12 +273,11 @@ function renderHeader(user, opts = {}) {
   <div class="absolute right-4 top-3 flex items-center gap-3">
     <button onclick="location.href='/login-modal'"
             class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-      Log in
+      ${t('login', lang)}
     </button>
   </div>
   `;
 
-  // ロゴ（中央）
   return `
 <div class="fixed top-0 left-0 right-0 z-40 pt-0 flex justify-center">
   <button onclick="location.href='/'" class="flex items-center -mt-3">
@@ -509,7 +556,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
   const header = renderHeader(user, { showProfileIcon: true });
   const theme = user.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
-
+  const locale = user.lang || 'ja-JP';
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -561,13 +608,13 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
 <body class="${themeClass} min-h-screen">
   ${header}
   <div class="max-w-xl mx-auto pt-32 pb-16 px-4">
-    <h1 class="text-2xl font-bold mb-6">設定</h1>
+    <h1 class="text-2xl font-bold mb-6">${t('settings', locale)}</h1>
 
     <!-- ユーザー情報 -->
     <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
       <button onclick="document.getElementById('user-info-form').classList.toggle('hidden')"
               class="w-full flex items-center justify-between text-left">
-        <span class="font-semibold text-lg">ユーザー情報</span>
+        <span class="font-semibold text-lg">${t('userInfo', locale)}</span>
         <span class="text-gray-400 text-xl">▼</span>
       </button>
 
@@ -594,7 +641,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
     <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
       <button onclick="document.getElementById('display-settings').classList.toggle('hidden')"
               class="w-full flex items-center justify-between text-left">
-        <span class="font-semibold text-lg">画面設定</span>
+        <span class="font-semibold text-lg">${t('displaySettings', locale)}</span>
         <span class="text-gray-400 text-xl">▼</span>
       </button>
 
@@ -622,11 +669,41 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
       </form>
     </div>
 
+    <!-- 言語 / 地域設定 -->
+    <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
+      <button onclick="document.getElementById('lang-settings').classList.toggle('hidden')"
+              class="w-full flex items-center justify-between text-left">
+        <span class="font-semibold text-lg">言語 / 地域</span>
+        <span class="text-gray-400 text-xl">▼</span>
+      </button>
+
+      <form id="lang-settings" action="/settings/lang" method="POST" class="mt-4 hidden text-sm">
+        <p class="mb-3 text-gray-600">表示言語と時間表示の地域を選択</p>
+        <div class="space-y-2 mb-4">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="langRegion" value="jp"
+                   ${user.lang === 'ja-JP' ? 'checked' : ''}>
+            <span>日本（日本語 / 日本時間）</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="langRegion" value="us"
+                   ${user.lang === 'en-US' ? 'checked' : ''}>
+            <span>アメリカ（英語 / 米国時間）</span>
+          </label>
+        </div>
+
+        <button type="submit"
+                class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-full font-semibold">
+          保存
+        </button>
+      </form>
+    </div>
+    
     <!-- バージョン履歴 -->
     <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
       <button onclick="document.getElementById('version-history').classList.toggle('hidden')"
               class="w-full flex items-center justify-between text-left">
-        <span class="font-semibold text-lg">バージョン履歴</span>
+        <span class="font-semibold text-lg">${t('versionHistory', locale)}</span>
         <span class="text-gray-400 text-xl">▼</span>
       </button>
 
@@ -742,6 +819,45 @@ app.post('/settings/theme', ensureAuthenticated, async (req, res) => {
   });
 });
 
+app.post('/settings/lang', ensureAuthenticated, async (req, res) => {
+  const userId = req.user.id;
+  const { langRegion } = req.body;
+
+  // デフォルト
+  let lang = 'ja-JP';
+  let time_zone = 'Asia/Tokyo';
+
+  if (langRegion === 'us') {
+    lang = 'en-US';
+    time_zone = 'America/Los_Angeles'; // 好きなアメリカのTZに変えてOK
+  }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ lang, time_zone })
+    .eq('id', userId);
+
+  if (error) {
+    console.error('Lang update error:', error);
+    return res.send(
+      '<script>alert("言語設定の更新中にエラーが発生しました。"); history.back();</script>'
+    );
+  }
+
+  // 新しいユーザー情報でセッション更新
+  const { data: updatedUser } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  req.login(updatedUser, () => {
+    res.send(
+      '<script>alert("言語 / 地域設定を保存しました。"); location.href="/settings";</script>'
+    );
+  });
+});
+
 // =============================
 // プロフィール
 // =============================
@@ -754,7 +870,14 @@ app.get('/profile/:id', async (req, res) => {
   const viewer = req.user;
   const theme = viewer?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
-
+  const locale = viewer?.lang || 'ja-JP';
+  const timeZone = viewer?.time_zone || 'Asia/Tokyo';
+  function formatTime(dateStr, opts = {}) {
+    return new Date(dateStr).toLocaleString(locale, {
+      timeZone,
+      ...opts
+    });
+  }
   const { data: profileUser, error: userError } = await supabase
     .from('users')
     .select('*')
@@ -845,10 +968,22 @@ app.get('/profile/:id', async (req, res) => {
                 }">
                   ${p.type === 'company' ? '企業' : '物事'}
                 </span>
-                <span>${new Date(p.time).toLocaleString('ja-JP', {
+              
+              // メインの投稿カード
+              <span class="text-gray-500 text-sm">
+                ${formatTime(p.time, {
                   hour: '2-digit',
                   minute: '2-digit'
-                })}</span>
+                })}
+              </span>
+
+              // いいねタブの投稿 / 返信の小さい時間表示
+              <span class="text-[11px] text-gray-400">
+                ${formatTime(r.time, {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </span>
               </div>
             </div>
             <p class="mt-2 text-sm whitespace-pre-wrap break-words">${p.text}</p>
@@ -882,7 +1017,7 @@ app.get('/profile/:id', async (req, res) => {
 
   const postsHtml =
     userPosts.length === 0
-      ? '<p class="text-gray-500 text-sm">まだ投稿がありません。</p>'
+      ? '<p class="text-gray-500 text-sm">${t('noPosts', locale)}</p>'
       : userPosts.map((p) => renderPostCard(p)).join('');
 
   const likesHtml =
@@ -1054,7 +1189,14 @@ app.get('/post/:id', async (req, res) => {
   const theme = viewer?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
   const header = renderHeader(viewer, { showProfileIcon: true });
-
+  const locale = viewer?.lang || 'ja-JP';
+  const timeZone = viewer?.time_zone || 'Asia/Tokyo';
+  function formatTime(dateStr, opts = {}) {
+    return new Date(dateStr).toLocaleString(locale, {
+      timeZone,
+      ...opts
+    });
+  }
   // 対象の投稿本体
   const { data: post, error: postError } = await supabase
     .from('posts')
@@ -1106,7 +1248,7 @@ app.get('/post/:id', async (req, res) => {
     const likeInfo = likesMap[p.id] || { count: 0, likedByViewer: false };
     const likeIcon = likeInfo.likedByViewer ? '❤️' : '🤍';
 
-    const fullTime = new Date(p.time).toLocaleString('ja-JP', {
+    const fullTime = formatTime(p.time, {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -1176,7 +1318,7 @@ app.get('/post/:id', async (req, res) => {
     const likeInfo = likesMap[r.id] || { count: 0, likedByViewer: false };
     const likeIcon = likeInfo.likedByViewer ? '❤️' : '🤍';
 
-    const timeStr = new Date(r.time).toLocaleString('ja-JP', {
+    const timeStr = formatTime(r.time, {
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
@@ -1369,6 +1511,15 @@ app.get('/', async (req, res) => {
   const replyTo = req.query.replyTo || '';
   const theme = user?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
+  const locale = user?.lang || 'ja-JP';
+  const timeZone = user?.time_zone || 'Asia/Tokyo';
+  function formatTime(dateStr, opts = {}) {
+    return new Date(dateStr).toLocaleString(locale, {
+      timeZone,
+      ...opts
+    });
+  }
+  const header = renderHeader(user, { showProfileIcon: true });
   let postsQuery = supabase
     .from('posts')
     .select(
@@ -1453,7 +1604,7 @@ app.get('/', async (req, res) => {
                   }">
                     ${p.type === 'company' ? '企業' : '物事'}
                   </span>
-                  <span>${new Date(p.time).toLocaleString('ja-JP', {
+                  <span>${formatTime(p.time, {
                     hour: '2-digit',
                     minute: '2-digit'
                   })}</span>
@@ -1558,7 +1709,7 @@ app.get('/', async (req, res) => {
     <div class="relative mb-8">
       <form action="/" method="GET">
         <input type="text" name="q" value="${search}"
-               placeholder="キーワードで検索"
+               placeholder="${t('searchPlaceholder', locale)}"
                class="search-box w-full pl-12 pr-6 py-4 text-lg rounded-full border border-gray-300 focus:outline-none focus:border-indigo-500">
         <svg class="absolute left-4 top-5 w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1567,7 +1718,7 @@ app.get('/', async (req, res) => {
       </form>
     </div>
 
-    <h2 class="text-2xl font-bold mb-6">最近のトピック</h2>
+    <h2 class="text-2xl font-bold mb-6">>${t('recentTopics', locale)}</h2>
     <div class="space-y-4">
       ${postsHtml}
     </div>
@@ -1579,7 +1730,7 @@ app.get('/', async (req, res) => {
       : "location.href='/login-modal'"
   }"
           class="fixed bottom-6 right-6 w-44 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center text-xl font-bold z-[100] transition-all hover:scale-105">
-    投稿する
+    ${t('postButton', locale)}
   </button>
 
   <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
