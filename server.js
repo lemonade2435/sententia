@@ -457,6 +457,7 @@ app.get('/signup', (req, res) => {
 // =============================
 app.post('/signup', async (req, res) => {
   try {
+    const lang = req.user?.lang || 'ja';
     const { username, password } = req.body;
     let { handle } = req.body;
 
