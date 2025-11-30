@@ -1215,10 +1215,14 @@ app.get('/profile/:id', async (req, res) => {
 // 投稿詳細ページ
 // =============================
 app.get('/post/:id', async (req, res) => {
-  const viewer = req.user;
+  const postId = req.params.id;
+  const viewer = req.user || null;
+
+  // テーマと言語／タイムゾーン
   const theme = viewer?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
   const header = renderHeader(viewer, { showProfileIcon: true });
+
   const locale = viewer?.lang || 'ja-JP';
   const timeZone = viewer?.time_zone || 'Asia/Tokyo';
 
@@ -1229,8 +1233,7 @@ app.get('/post/:id', async (req, res) => {
     });
   }
 
-  const postId = req.params.id;
-
+  // 投稿本体
   const { data: post, error: postError } = await supabase
     .from('posts')
     .select(
@@ -1243,6 +1246,7 @@ app.get('/post/:id', async (req, res) => {
     return res.send('<h1>投稿が見つかりませんでした。</h1>');
   }
 
+  // 返信一覧
   const { data: repliesData } = await supabase
     .from('posts')
     .select(
@@ -1253,6 +1257,7 @@ app.get('/post/:id', async (req, res) => {
 
   const replies = repliesData || [];
 
+  // いいね取得（投稿＋返信全部）
   const allIds = [post.id, ...replies.map((r) => r.id)];
   const likesMap = {};
 
@@ -1275,6 +1280,7 @@ app.get('/post/:id', async (req, res) => {
     }
   }
 
+  // メイン投稿のカード
   function renderMainPost(p) {
     const likeInfo = likesMap[p.id] || { count: 0, likedByViewer: false };
     const likeIcon = likeInfo.likedByViewer ? '❤️' : '🤍';
@@ -1345,6 +1351,7 @@ app.get('/post/:id', async (req, res) => {
     `;
   }
 
+  // 返信カード
   function renderReply(r) {
     const likeInfo = likesMap[r.id] || { count: 0, likedByViewer: false };
     const likeIcon = likeInfo.likedByViewer ? '❤️' : '🤍';
@@ -1445,16 +1452,17 @@ app.get('/post/:id', async (req, res) => {
 
   <div class="max-w-2xl mx-auto pt-32 pb-16 px-4">
     <button onclick="history.back()"
-            class="text-sm text-blue-500 hover:underline mb-4">&larr; ${t('back', lang)}</button>
+            class="text-sm text-blue-500 hover:underline mb-4">&larr; 戻る</button>
 
     ${renderMainPost(post)}
 
-    <h2 class="text-sm font-semibold mb-2">${t('replies', lang)}</h2>
+    <h2 class="text-sm font-semibold mb-2">返信</h2>
     <div class="space-y-2">
       ${repliesHtml}
     </div>
   </div>
 
+  <!-- 返信用モーダル -->
   <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
     <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
       <button onclick="closePostModal()"
