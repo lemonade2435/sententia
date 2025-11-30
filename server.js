@@ -1017,7 +1017,7 @@ app.get('/profile/:id', async (req, res) => {
 
   const postsHtml =
     userPosts.length === 0
-      ? '<p class="text-gray-500 text-sm">${t('noPosts', locale)}</p>'
+      ? '<p class="text-gray-500 text-sm">${t("noPosts", locale)}</p>'
       : userPosts.map((p) => renderPostCard(p)).join('');
 
   const likesHtml =
