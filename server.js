@@ -508,7 +508,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
   const user = req.user;
   const header = renderHeader(user, { showProfileIcon: true });
   const theme = user.theme || 'system';
-  const themeClass = theme === 'dark' ? 'dark-mode' : '';
+  const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
 
   res.send(`<!DOCTYPE html>
 <html lang="ja">
@@ -558,7 +558,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
   }
 </style>
 </head>
-<body class="${themeClass} bg-gray-100 min-h-screen">
+<body class="${themeClass} min-h-screen">
   ${header}
   <div class="max-w-xl mx-auto pt-32 pb-16 px-4">
     <h1 class="text-2xl font-bold mb-6">設定</h1>
@@ -726,7 +726,7 @@ app.get('/profile/:id', async (req, res) => {
   const profileUserId = req.params.id;
   const viewer = req.user;
   const theme = viewer?.theme || 'system';
-  const themeClass = theme === 'dark' ? 'dark-mode' : '';
+  const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
 
   const { data: profileUser, error: userError } = await supabase
     .from('users')
@@ -911,7 +911,7 @@ app.get('/profile/:id', async (req, res) => {
   }
 </style>
 </head>
-<body class="${themeClass} bg-gray-100 min-h-screen">
+<body class="${themeClass} min-h-screen">
   ${header}
   <div class="max-w-2xl mx-auto pt-32 pb-16 px-4">
     <div class="bg-white rounded-2xl shadow-md p-6 mb-6">
@@ -997,7 +997,7 @@ app.get('/', async (req, res) => {
   const search = (req.query.q || '').trim();
   const replyTo = req.query.replyTo || '';
   const theme = user?.theme || 'system';
-  const themeClass = theme === 'dark' ? 'dark-mode' : '';
+  const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
   let postsQuery = supabase
     .from('posts')
     .select(
@@ -1210,7 +1210,7 @@ app.get('/', async (req, res) => {
   }
 </style>
 </head>
-<body class="${themeClass} bg-gray-100 min-h-screen">
+<body class="${themeClass} min-h-screen">
   ${header}
 
   <div class="max-w-2xl mx-auto pt-32 pb-32 px-4">
