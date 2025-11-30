@@ -558,7 +558,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
   }
 </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="${themeClass} min-h-screen">
   ${header}
   <div class="max-w-xl mx-auto pt-32 pb-16 px-4">
     <h1 class="text-2xl font-bold mb-6">設定</h1>
@@ -911,7 +911,7 @@ app.get('/profile/:id', async (req, res) => {
   }
 </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="${themeClass} min-h-screen">
   ${header}
   <div class="max-w-2xl mx-auto pt-32 pb-16 px-4">
     <div class="bg-white rounded-2xl shadow-md p-6 mb-6">
@@ -1210,7 +1210,7 @@ app.get('/', async (req, res) => {
   }
 </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="${themeClass} min-h-screen">
   ${header}
 
   <div class="max-w-2xl mx-auto pt-32 pb-32 px-4">
@@ -1317,41 +1317,6 @@ app.get('/', async (req, res) => {
         alert('ネットワークエラーが発生しました。');
       }
     }
-
-    // テーマ適用（light / dark / system）
-    (function () {
-      const theme = '${theme}';  // ← ここは ${theme} にする
-      const body = document.body;
-
-      function applyTheme() {
-        if (theme === 'dark') {
-          body.classList.add('dark-mode');
-          body.classList.remove('bg-gray-100');
-        } else if (theme === 'light') {
-          body.classList.remove('dark-mode');
-          body.classList.add('bg-gray-100');
-        } else {
-          // system
-          const prefersDark =
-            window.matchMedia &&
-            window.matchMedia('(prefers-color-scheme: dark)').matches;
-          if (prefersDark) {
-            body.classList.add('dark-mode');
-            body.classList.remove('bg-gray-100');
-          } else {
-            body.classList.remove('dark-mode');
-            body.classList.add('bg-gray-100');
-          }
-        }
-      }
-
-      applyTheme();
-
-      if (theme === 'system' && window.matchMedia) {
-        const mq = window.matchMedia('(prefers-color-scheme: dark)');
-        mq.addEventListener('change', applyTheme);
-      }
-    })();
   </script>
   </body>
   </html>`);
