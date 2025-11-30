@@ -273,7 +273,7 @@ function renderHeader(user, opts = {}) {
   <div class="absolute right-4 top-3 flex items-center gap-3">
     <button onclick="location.href='/login-modal'"
             class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-      ${t('login', lang)}
+      ${t("login", lang)}
     </button>
   </div>
   `;
