@@ -1640,8 +1640,6 @@ app.get('/', async (req, res) => {
     `;
   }
 
-  const header = renderHeader(user, { showProfileIcon: true });
-
   const postsHtml =
     topPosts.length === 0
       ? '<p class="text-gray-500">まだ投稿がありません。</p>'
