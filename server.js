@@ -871,8 +871,9 @@ app.get('/me', ensureAuthenticated, (req, res) => {
 });
 
 app.get('/profile/:id', async (req, res) => {
-  const viewer = req.user;
   const lang = getLang(req);
+  const profileUserId = req.params.id;
+  const viewer = req.user;
   const theme = viewer?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
   const locale = viewer?.lang || 'ja-JP';
@@ -885,8 +886,7 @@ app.get('/profile/:id', async (req, res) => {
     });
   }
 
-  const profileUserId = req.params.id;
-
+  // プロフィール対象ユーザー
   const { data: profileUser, error: userError } = await supabase
     .from('users')
     .select('*')
@@ -897,6 +897,40 @@ app.get('/profile/:id', async (req, res) => {
     return res.send('<h1>ユーザーが見つかりませんでした。</h1>');
   }
 
+  // フォロー数 / フォロワー数
+  let followerCount = 0;
+  let followingCount = 0;
+  let isFollowing = false;
+  const isMe = viewer && viewer.id === profileUserId;
+
+  // フォロワー数
+  const { count: followerCountRes } = await supabase
+    .from('follows')
+    .select('id', { count: 'exact', head: true })
+    .eq('following_id', profileUserId);
+  followerCount = followerCountRes || 0;
+
+  // フォロー数
+  const { count: followingCountRes } = await supabase
+    .from('follows')
+    .select('id', { count: 'exact', head: true })
+    .eq('follower_id', profileUserId);
+  followingCount = followingCountRes || 0;
+
+  // ログイン中ユーザーがこの人をフォローしているか
+  if (viewer && !isMe) {
+    const { data: followRows, error: followErr } = await supabase
+      .from('follows')
+      .select('id')
+      .eq('follower_id', viewer.id)
+      .eq('following_id', profileUserId);
+
+    if (!followErr && followRows && followRows.length > 0) {
+      isFollowing = true;
+    }
+  }
+
+  // このユーザーの投稿
   const { data: postsData } = await supabase
     .from('posts')
     .select(
@@ -907,6 +941,7 @@ app.get('/profile/:id', async (req, res) => {
 
   const userPosts = postsData || [];
 
+  // このユーザーがいいねした投稿
   let likedPosts = [];
   const { data: likesData } = await supabase
     .from('likes')
@@ -926,6 +961,7 @@ app.get('/profile/:id', async (req, res) => {
     likedPosts = likedData || [];
   }
 
+  // いいね情報
   const allPosts = [...userPosts, ...likedPosts];
   const likesMap = {};
 
@@ -977,12 +1013,10 @@ app.get('/profile/:id', async (req, res) => {
                 }">
                   ${p.type === 'company' ? '企業' : '物事'}
                 </span>
-                <span>
-                  ${formatTime(p.time, {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </span>
+                <span>${formatTime(p.time, {
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}</span>
               </div>
             </div>
             <p class="mt-2 text-sm whitespace-pre-wrap break-words">${p.text}</p>
@@ -1016,13 +1050,30 @@ app.get('/profile/:id', async (req, res) => {
 
   const postsHtml =
     userPosts.length === 0
-      ? `<p class="text-gray-500 text-sm">${t('noPosts', locale)}</p>`
+      ? '<p class="text-gray-500 text-sm">まだ投稿がありません。</p>'
       : userPosts.map((p) => renderPostCard(p)).join('');
 
   const likesHtml =
     likedPosts.length === 0
       ? '<p class="text-gray-500 text-sm">まだいいねした投稿がありません。</p>'
       : likedPosts.map((p) => renderPostCard(p)).join('');
+
+  // フォローボタンの HTML（自分のプロフィールなら表示しない）
+  const followButtonHtml =
+    viewer && !isMe
+      ? `
+      <form action="/follow/${profileUser.id}" method="POST">
+        <button type="submit"
+                class="px-4 py-1 rounded-full text-sm font-semibold border ${
+                  isFollowing
+                    ? 'bg-blue-500 text-white border-blue-500'
+                    : 'bg-white text-blue-500 border-blue-500'
+                }">
+          ${isFollowing ? 'フォロー中' : 'フォロー'}
+        </button>
+      </form>
+    `
+      : '';
 
   res.send(`<!DOCTYPE html>
 <html lang="ja">
@@ -1063,16 +1114,24 @@ app.get('/profile/:id', async (req, res) => {
   ${header}
   <div class="max-w-2xl mx-auto pt-32 pb-16 px-4">
     <div class="bg-white rounded-2xl shadow-md p-6 mb-6">
-      <div class="flex items-center gap-4">
-        <div class="w-16 h-16 rounded-full flex items-center justify-center bg-blue-100">
-          <svg viewBox="0 0 24 24" class="w-10 h-10 text-blue-500" fill="currentColor">
-            <path d="M12 12c2.8 0 5-2.2 5-5s-2.2-5-5-5-5 2.2-5 5 2.2 5 5 5zm0 2c-3.9 0-7 2.4-7 5.3V21h14v-1.7C19 16.4 15.9 14 12 14z"/>
-          </svg>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-4">
+          <div class="w-16 h-16 rounded-full flex items-center justify-center bg-blue-100">
+            <svg viewBox="0 0 24 24" class="w-10 h-10 text-blue-500" fill="currentColor">
+              <path d="M12 12c2.8 0 5-2.2 5-5s-2.2-5-5-5-5 2.2-5 5 2.2 5 5 5zm0 2c-3.9 0-7 2.4-7 5.3V21h14v-1.7C19 16.4 15.9 14 12 14z"/>
+            </svg>
+          </div>
+          <div>
+            <div class="text-xl font-bold">${profileUser.username || 'ユーザー'}</div>
+            <div class="text-sm text-gray-500">${profileUser.handle || '@user'}</div>
+
+            <div class="mt-2 flex items-center gap-4 text-sm">
+              <span><span class="font-semibold">${followingCount}</span> フォロー中</span>
+              <span><span class="font-semibold">${followerCount}</span> フォロワー</span>
+            </div>
+          </div>
         </div>
-        <div>
-          <div class="text-xl font-bold">${profileUser.username || 'ユーザー'}</div>
-          <div class="text-sm text-gray-500">${profileUser.handle || '@user'}</div>
-        </div>
+        ${followButtonHtml}
       </div>
     </div>
 
@@ -1151,6 +1210,7 @@ app.get('/profile/:id', async (req, res) => {
       }
 
       applySystemTheme();
+
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
       mq.addEventListener('change', applySystemTheme);
     })();
@@ -1890,6 +1950,73 @@ app.post('/like/:postId', ensureAuthenticated, async (req, res) => {
   } catch (err) {
     console.error('like toggle error', err);
     return res.status(500).send('error');
+  }
+});
+
+// =============================
+// フォロー / アンフォロー
+// =============================
+app.post('/follow/:targetId', ensureAuthenticated, async (req, res) => {
+  const followerId = req.user.id;
+  const targetId = req.params.targetId;
+
+  if (followerId === targetId) {
+    return res.send(
+      '<script>alert("自分自身をフォローすることはできません。"); history.back();</script>'
+    );
+  }
+
+  try {
+    // 既にフォローしているか？
+    const { data: rows, error: selectErr } = await supabase
+      .from('follows')
+      .select('id')
+      .eq('follower_id', followerId)
+      .eq('following_id', targetId);
+
+    if (selectErr) {
+      console.error('follow select error', selectErr);
+      return res.send(
+        '<script>alert("フォロー状態の確認でエラーが発生しました。"); history.back();</script>'
+      );
+    }
+
+    if (rows && rows.length > 0) {
+      // すでにフォロー → アンフォローする
+      const followId = rows[0].id;
+      const { error: delErr } = await supabase
+        .from('follows')
+        .delete()
+        .eq('id', followId);
+
+      if (delErr) {
+        console.error('unfollow error', delErr);
+        return res.send(
+          '<script>alert("フォロー解除に失敗しました。"); history.back();</script>'
+        );
+      }
+    } else {
+      // まだフォローしていない → フォローする
+      const { error: insErr } = await supabase.from('follows').insert({
+        follower_id: followerId,
+        following_id: targetId
+      });
+
+      if (insErr) {
+        console.error('follow insert error', insErr);
+        return res.send(
+          '<script>alert("フォローに失敗しました。"); history.back();</script>'
+        );
+      }
+    }
+
+    // 元のプロフィールに戻す
+    res.redirect('back');
+  } catch (err) {
+    console.error('follow toggle error', err);
+    return res.send(
+      '<script>alert("フォロー処理中にエラーが発生しました。"); history.back();</script>'
+    );
   }
 });
 
