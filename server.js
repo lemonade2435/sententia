@@ -1314,7 +1314,7 @@ app.get('/', async (req, res) => {
         alert('ネットワークエラーが発生しました。');
       }
     }
-     <script>
+<script>
   (function () {
     const theme = "{{theme}}";  // ← EJS/Handlebars/JS テンプレの安全な書き方
     const body = document.body;
