@@ -1317,6 +1317,30 @@ app.get('/', async (req, res) => {
         alert('ネットワークエラーが発生しました。');
       }
     }
+  (function () {
+    const theme = '${theme}';
+    if (theme !== 'system') return;
+
+    const body = document.body;
+
+    function applySystemTheme() {
+      const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (dark) {
+        body.classList.add('dark-mode');
+        body.classList.remove('bg-gray-100');
+      } else {
+        body.classList.remove('dark-mode');
+        body.classList.add('bg-gray-100');
+      }
+    }
+
+    // 初回適用
+    applySystemTheme();
+
+    // OS が切り替わったら反映
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    mq.addEventListener('change', applySystemTheme);
+  })();
   </script>
   </body>
   </html>`);
