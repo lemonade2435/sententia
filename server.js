@@ -871,7 +871,6 @@ app.get('/me', ensureAuthenticated, (req, res) => {
 
 app.get('/profile/:id', async (req, res) => {
   const lang = req.user?.lang || 'ja';
-  const t = getTranslator(lang);
   const profileUserId = req.params.id;
   const viewer = req.user;
   const theme = viewer?.theme || 'system';
@@ -1513,7 +1512,6 @@ app.get('/post/:id', async (req, res) => {
 // =============================
 app.get('/', async (req, res) => {
   const lang = req.user?.lang || 'ja';
-  const t = getTranslator(lang);
   const user = req.user;
   const search = (req.query.q || '').trim();
   const replyTo = req.query.replyTo || '';
