@@ -1045,6 +1045,320 @@ app.get('/profile/:id', async (req, res) => {
 </body>
 </html>`);
 });
+// =============================
+// 投稿詳細ページ
+// =============================
+app.get('/post/:id', async (req, res) => {
+  const postId = req.params.id;
+  const viewer = req.user;
+  const theme = viewer?.theme || 'system';
+  const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
+  const header = renderHeader(viewer, { showProfileIcon: true });
+
+  // 対象の投稿本体
+  const { data: post, error: postError } = await supabase
+    .from('posts')
+    .select(
+      'id, user_id, type, text, time, parent_post_id, users(username, handle)'
+    )
+    .eq('id', postId)
+    .single();
+
+  if (postError || !post) {
+    return res.send('<h1>投稿が見つかりませんでした。</h1>');
+  }
+
+  // その投稿への返信一覧
+  const { data: repliesData } = await supabase
+    .from('posts')
+    .select(
+      'id, user_id, type, text, time, parent_post_id, users(username, handle)'
+    )
+    .eq('parent_post_id', postId)
+    .order('time', { ascending: true });
+
+  const replies = repliesData || [];
+
+  // いいね情報
+  const allIds = [post.id, ...replies.map((r) => r.id)];
+  const likesMap = {};
+
+  if (allIds.length > 0) {
+    const { data: likesForAll } = await supabase
+      .from('likes')
+      .select('post_id, user_id')
+      .in('post_id', allIds);
+
+    if (likesForAll) {
+      likesForAll.forEach((like) => {
+        if (!likesMap[like.post_id]) {
+          likesMap[like.post_id] = { count: 0, likedByViewer: false };
+        }
+        likesMap[like.post_id].count++;
+        if (viewer && like.user_id === viewer.id) {
+          likesMap[like.post_id].likedByViewer = true;
+        }
+      });
+    }
+  }
+
+  function renderMainPost(p) {
+    const likeInfo = likesMap[p.id] || { count: 0, likedByViewer: false };
+    const likeIcon = likeInfo.likedByViewer ? '❤️' : '🤍';
+
+    const fullTime = new Date(p.time).toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+
+    return `
+      <div class="post-card bg-white rounded-2xl p-6 shadow-md mb-6">
+        <div class="flex items-start gap-3">
+          <button onclick="location.href='/profile/${p.user_id}'"
+                  class="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100">
+            <svg viewBox="0 0 24 24" class="w-6 h-6 text-blue-500" fill="currentColor">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
+            </svg>
+          </button>
+
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-base font-semibold">${p.users?.username || 'ユーザー'}</div>
+                <div class="text-xs text-gray-500">${p.users?.handle || '@user'}</div>
+              </div>
+              <span class="px-2 py-0.5 rounded-full text-xs font-medium ${
+                p.type === 'company'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-purple-100 text-purple-700'
+              }">
+                ${p.type === 'company' ? '企業' : '物事'}
+              </span>
+            </div>
+
+            <p class="mt-3 text-sm whitespace-pre-wrap break-words">${p.text}</p>
+
+            <div class="mt-4 text-xs text-gray-500">
+              ${fullTime}
+            </div>
+
+            <div class="mt-3 flex items-center gap-6 text-sm text-gray-500">
+              <button type="button"
+                      onclick="${
+                        viewer
+                          ? `openPostModal('${p.id}')`
+                          : "location.href='/login-modal'"
+                      }"
+                      class="flex items-center gap-1 hover:text-blue-500">
+                💬
+              </button>
+              <button type="button"
+                      onclick="${
+                        viewer
+                          ? `handleLike('${p.id}')`
+                          : "location.href='/login-modal'"
+                      }"
+                      class="flex items-center gap-1 hover:text-pink-500">
+                <span>${likeIcon}</span><span>${likeInfo.count}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderReply(r) {
+    const likeInfo = likesMap[r.id] || { count: 0, likedByViewer: false };
+    const likeIcon = likeInfo.likedByViewer ? '❤️' : '🤍';
+
+    const timeStr = new Date(r.time).toLocaleString('ja-JP', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    return `
+      <div class="post-card bg-white rounded-2xl p-4 shadow-md">
+        <div class="flex items-start gap-2">
+          <button onclick="location.href='/profile/${r.user_id}'"
+                  class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50">
+            <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-400" fill="currentColor">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
+            </svg>
+          </button>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="text-xs font-semibold">${r.users?.username || 'ユーザー'}</div>
+                <div class="text-[11px] text-gray-500">${r.users?.handle || '@user'}</div>
+              </div>
+              <span class="text-[11px] text-gray-400">${timeStr}</span>
+            </div>
+            <p class="mt-1 text-xs whitespace-pre-wrap break-words">${r.text}</p>
+            <div class="mt-2 flex items-center gap-4 text-[11px] text-gray-500">
+              <button type="button"
+                      onclick="${
+                        viewer
+                          ? `openPostModal('${post.id}')`
+                          : "location.href='/login-modal'"
+                      }"
+                      class="flex items-center gap-1 hover:text-blue-500">
+                💬
+              </button>
+              <button type="button"
+                      onclick="${
+                        viewer
+                          ? `handleLike('${r.id}')`
+                          : "location.href='/login-modal'"
+                      }"
+                      class="flex items-center gap-1 hover:text-pink-500">
+                <span>${likeIcon}</span><span>${likeInfo.count}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  const repliesHtml =
+    replies.length === 0
+      ? '<p class="text-xs text-gray-500">まだ返信がありません。</p>'
+      : replies.map((r) => renderReply(r)).join('');
+
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>投稿詳細 - sententia</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+  .dark-mode {
+    background-color: #0d1117;
+    color: #e5e7eb;
+  }
+  .dark-mode .post-card,
+  .dark-mode .bg-white {
+    background-color: #1a1f28;
+    color: #f3f4f6;
+  }
+  .dark-mode input[type="text"],
+  .dark-mode textarea,
+  .dark-mode .search-box {
+    background-color: #1a1f28;
+    border-color: #374151;
+    color: #e5e7eb;
+  }
+  .dark-mode .text-gray-500 {
+    color: #9ca3af;
+  }
+  .dark-mode .border-gray-300 {
+    border-color: #4b5563;
+  }
+  .dark-mode .shadow-md {
+    box-shadow: none;
+  }
+  </style>
+</head>
+<body class="${themeClass} min-h-screen">
+  ${header}
+
+  <div class="max-w-2xl mx-auto pt-32 pb-16 px-4">
+    <button onclick="history.back()"
+            class="text-sm text-blue-500 hover:underline mb-4">&larr; 戻る</button>
+
+    ${renderMainPost(post)}
+
+    <h2 class="text-sm font-semibold mb-2">返信</h2>
+    <div class="space-y-2">
+      ${repliesHtml}
+    </div>
+  </div>
+
+  <!-- 返信用モーダル（ホームと共通で使うならそのまま or 簡略版でもOK） -->
+  <div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-8 relative">
+      <button onclick="closePostModal()"
+              class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
+
+      <form action="/post" method="POST">
+        <input type="hidden" name="parent_post_id" id="parent_post_id_input" value="${post.id}">
+        <div class="mb-4 text-sm text-gray-600">
+          返信を書く
+        </div>
+        <textarea name="opinion" placeholder="意見を入力（200文字まで）" required
+                  maxlength="200"
+                  class="w-full h-32 p-4 text-sm border-2 border-gray-200 rounded-2xl focus:border-blue-500 focus:outline-none resize-none mb-4"></textarea>
+
+        <input type="hidden" name="type" value="${post.type}">
+
+        <button type="submit"
+                class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-full shadow-lg transition-all hover:scale-105 absolute bottom-6 right-6">
+          送信
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function openPostModal(parentId) {
+      const modal = document.getElementById('modal');
+      const input = document.getElementById('parent_post_id_input');
+      input.value = parentId || '';
+      modal.classList.remove('hidden');
+    }
+
+    function closePostModal() {
+      document.getElementById('modal').classList.add('hidden');
+      document.getElementById('parent_post_id_input').value = '';
+    }
+
+    async function handleLike(postId) {
+      try {
+        const res = await fetch('/like/' + postId, { method: 'POST' });
+        if (res.ok) {
+          location.reload();
+        } else {
+          alert('いいねの処理に失敗しました。');
+        }
+      } catch (e) {
+        alert('ネットワークエラーが発生しました。');
+      }
+    }
+
+    (function () {
+      const theme = '${theme}';
+      if (theme !== 'system') return;
+
+      const body = document.body;
+
+      function applySystemTheme() {
+        const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (dark) {
+          body.classList.add('dark-mode');
+          body.classList.remove('bg-gray-100');
+        } else {
+          body.classList.remove('dark-mode');
+          body.classList.add('bg-gray-100');
+        }
+      }
+
+      applySystemTheme();
+
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      mq.addEventListener('change', applySystemTheme);
+    })();
+  </script>
+</body>
+</html>`);
+});
 
 // =============================
 // ホーム
@@ -1102,49 +1416,14 @@ app.get('/', async (req, res) => {
       repliesByParent[p.parent_post_id].push(p);
     });
 
-  function renderPostCard(p, replies) {
+    function renderPostCard(p, replies) {
     const likeInfo = likesMap[p.id] || {
       count: 0,
       likedByUser: false
     };
     const likeIcon = likeInfo.likedByUser ? '❤️' : '🤍';
 
-    const repliesHtml =
-      replies && replies.length > 0
-        ? `
-      <div class="mt-3 border-l pl-4 space-y-2">
-        ${replies
-          .map(
-            (r) => `
-          <div class="flex items-start gap-2">
-            <button onclick="location.href='/profile/${r.user_id}'"
-                    class="w-8 h-8 rounded-full flex items-center justify-center bg-blue-50">
-              <svg viewBox="0 0 24 24" class="w-5 h-5 text-blue-400" fill="currentColor">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4zm0 2c-3.33 0-6 2.24-6 5v1h12v-1c0-2.76-2.67-5-6-5z"/>
-              </svg>
-            </button>
-            <div class="flex-1">
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="text-xs font-semibold">${r.users?.username || 'ユーザー'}</div>
-                  <div class="text-[11px] text-gray-500">${r.users?.handle || '@user'}</div>
-                </div>
-                <span class="text-[11px] text-gray-400">
-                  ${new Date(r.time).toLocaleString('ja-JP', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </span>
-              </div>
-              <p class="mt-1 text-xs whitespace-pre-wrap break-words">${r.text}</p>
-            </div>
-          </div>
-        `
-          )
-          .join('')}
-      </div>
-    `
-        : '';
+    const replyCount = replies ? replies.length : 0;
 
     return `
       <div class="post-card bg-white rounded-2xl p-6 shadow-md">
@@ -1157,27 +1436,32 @@ app.get('/', async (req, res) => {
           </button>
 
           <div class="flex-1">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="text-sm font-semibold">${p.users?.username || 'ユーザー'}</div>
-                <div class="text-xs text-gray-500">${p.users?.handle || '@user'}</div>
+            <!-- 全体クリックで詳細ページへ -->
+            <button type="button"
+                    onclick="location.href='/post/${p.id}'"
+                    class="w-full text-left">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-sm font-semibold">${p.users?.username || 'ユーザー'}</div>
+                  <div class="text-xs text-gray-500">${p.users?.handle || '@user'}</div>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-gray-500">
+                  <span class="px-2 py-0.5 rounded-full text-xs font-medium ${
+                    p.type === 'company'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-purple-100 text-purple-700'
+                  }">
+                    ${p.type === 'company' ? '企業' : '物事'}
+                  </span>
+                  <span>${new Date(p.time).toLocaleString('ja-JP', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}</span>
+                </div>
               </div>
-              <div class="flex items-center gap-2 text-xs text-gray-500">
-                <span class="px-2 py-0.5 rounded-full text-xs font-medium ${
-                  p.type === 'company'
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'bg-purple-100 text-purple-700'
-                }">
-                  ${p.type === 'company' ? '企業' : '物事'}
-                </span>
-                <span>${new Date(p.time).toLocaleString('ja-JP', {
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}</span>
-              </div>
-            </div>
 
-            <p class="mt-2 text-sm whitespace-pre-wrap break-words">${p.text}</p>
+              <p class="mt-2 text-sm whitespace-pre-wrap break-words">${p.text}</p>
+            </button>
 
             <div class="mt-3 flex items-center gap-6 text-sm text-gray-500">
               <button type="button"
@@ -1187,7 +1471,7 @@ app.get('/', async (req, res) => {
                           : "location.href='/login-modal'"
                       }"
                       class="flex items-center gap-1 hover:text-blue-500">
-                💬<span>${replies ? replies.length : 0}</span>
+                💬<span>${replyCount}</span>
               </button>
               <button type="button"
                       onclick="${
@@ -1201,7 +1485,6 @@ app.get('/', async (req, res) => {
             </div>
           </div>
         </div>
-        ${repliesHtml}
       </div>
     `;
   }
