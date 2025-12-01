@@ -95,10 +95,11 @@ passport.use(
               google_id: profile.id,
               username,
               email,
-              handle
-            })
-            .select()
-            .single();
+              handle,
+              profile_completed: false  
+             })
+             .select()
+             .single();
 
           if (insertError) return done(insertError);
           user = inserted;
@@ -309,7 +310,16 @@ app.get(
 app.get(
   '/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/login-modal' }),
-  (req, res) => res.redirect('/')
+  (req, res) => {
+    const u = req.user;
+    const needsDetails =
+      !u.profile_completed || !u.birthdate || !u.gender;
+
+    if (needsDetails) {
+      return res.redirect('/signup/details');
+    }
+    return res.redirect('/');
+  }
 );
 
 // =============================
@@ -368,6 +378,8 @@ app.get('/login-modal', (req, res) => {
 // サインアップ画面
 // =============================
 app.get('/signup', (req, res) => {
+  const lang = getLang(req);
+  const _t = (key) => t(key, lang);
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -387,22 +399,58 @@ app.get('/signup', (req, res) => {
     <button onclick="location.href='/'"
             class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-3xl">×</button>
     <h2 class="text-2xl font-bold text-center mb-6">アカウントを作成</h2>
+
     <form action="/signup" method="POST">
+      <!-- ユーザー名 -->
       <input type="text" name="username" placeholder="ユーザー名（20文字まで）"
              maxlength="20" required
              class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+
+      <!-- パスワード -->
       <input type="password" name="password" placeholder="パスワード" required
              class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+
+      <!-- ユーザーID (@〜) -->
       <input type="text" name="handle" placeholder="@ユーザーID（任意、20文字まで）"
              maxlength="20"
              class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
 
-      <div class="text-xs text-gray-600 mb-6">
-        登録することで
-        <button type="button" onclick="openModal('tos-modal')" class="text-blue-500 underline">利用規約</button>
-        と
-        <button type="button" onclick="openModal('privacy-modal')" class="text-blue-500 underline">プライバシーポリシー</button>
-        に同意したものとみなされます。
+      <!-- 生年月日 -->
+      <label class="block mb-2 text-sm text-gray-600">生年月日</label>
+      <input type="date" name="birthdate" required
+             class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+
+      <!-- 性別 -->
+      <label class="block mb-2 text-sm text-gray-600">性別</label>
+      <div class="flex gap-4 mb-4 text-sm">
+        <label class="flex items-center gap-2">
+          <input type="radio" name="gender" value="male" required>
+          <span>男性</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="radio" name="gender" value="female">
+          <span>女性</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="radio" name="gender" value="other">
+          <span>その他</span>
+        </label>
+      </div>
+
+      <!-- 利用規約チェックボックス（※ここに「同意したものとみなします」を統合） -->
+      <div class="flex items-start gap-2 mb-6 text-xs text-gray-600">
+        <input type="checkbox" name="agree" value="1" required class="mt-1">
+        <span>
+          上の内容を送信することで、
+          <button type="button" onclick="openModal('tos-modal')" class="text-blue-500 underline">
+            利用規約
+          </button>
+          および
+          <button type="button" onclick="openModal('privacy-modal')" class="text-blue-500 underline">
+            プライバシーポリシー
+          </button>
+          に同意したことを確認します。
+        </span>
       </div>
 
       <button type="submit"
@@ -502,7 +550,8 @@ app.post('/signup', async (req, res) => {
       .insert({
         username,
         password: hashedPassword,
-        handle
+        handle,
+        profile_completed: false   // ★ まだ詳細未入力
       })
       .select()
       .single();
@@ -515,7 +564,8 @@ app.post('/signup', async (req, res) => {
       );
     }
 
-    req.login(data, () => res.redirect('/'));
+    // いったんログインさせてから詳細入力ページへ
+    req.login(data, () => res.redirect('/signup/details'));
   } catch (err) {
     console.error('Supabase signup error:', err);
     return res.send(
@@ -550,13 +600,173 @@ app.post('/login', async (req, res) => {
       );
     }
 
-    req.login(user, () => res.redirect('/'));
+    const needsDetails =
+      !user.profile_completed || !user.birthdate || !user.gender;
+
+    req.login(user, () => {
+      if (needsDetails) {
+        return res.redirect('/signup/details');
+      }
+      return res.redirect('/');
+    });
   } catch (err) {
     console.error('Login error:', err);
     return res.send(
       '<script>alert("ログイン中にエラーが発生しました。"); history.back();</script>'
     );
   }
+});
+
+// =============================
+// サインアップ詳細入力（生年月日・性別・規約同意）
+// =============================
+app.get('/signup/details', ensureAuthenticated, (req, res) => {
+  const user = req.user;
+
+  // すでに完了しているならホームへ
+  if (user.profile_completed && user.birthdate && user.gender) {
+    return res.redirect('/');
+  }
+
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>プロフィール詳細 - sententia</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+  <div class="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-lg relative">
+    <h2 class="text-2xl font-bold text-center mb-6">プロフィール情報の入力</h2>
+
+    <form action="/signup/details" method="POST" class="space-y-5">
+
+      <div>
+        <label class="block text-sm font-semibold mb-1">生年月日</label>
+        <input type="date" name="birthdate" required
+               class="w-full px-4 py-2 border border-gray-300 rounded-2xl focus:outline-none focus:border-blue-500">
+      </div>
+
+      <div>
+        <span class="block text-sm font-semibold mb-1">性別</span>
+        <div class="flex gap-4 text-sm">
+          <label class="flex items-center gap-2">
+            <input type="radio" name="gender" value="male" required>
+            <span>男性</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="radio" name="gender" value="female">
+            <span>女性</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="radio" name="gender" value="other">
+            <span>その他</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="text-xs text-gray-600 space-y-2">
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input type="checkbox" name="agree_tos" value="1" required class="mt-1">
+          <span>
+            利用規約に同意します
+            （<a href="javascript:void(0)" onclick="openModal('tos-modal')" class="text-blue-500 underline">内容を表示</a>）
+          </span>
+        </label>
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input type="checkbox" name="agree_privacy" value="1" required class="mt-1">
+          <span>
+            プライバシーポリシーに同意します
+            （<a href="javascript:void(0)" onclick="openModal('privacy-modal')" class="text-blue-500 underline">内容を表示</a>）
+          </span>
+        </label>
+      </div>
+
+      <button type="submit"
+              class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
+        保存してはじめる
+      </button>
+    </form>
+  </div>
+
+  <!-- 利用規約モーダル -->
+  <div id="tos-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-6 relative">
+      <button onclick="closeModal('tos-modal')"
+              class="absolute top-3 right-4 text-gray-400 hover:text-gray-600 text-2xl">×</button>
+      <h3 class="text-xl font-bold mb-4">利用規約</h3>
+      <div class="max-h-80 overflow-y-auto text-sm text-gray-700 space-y-2">
+        <p>本サービス「sententia」は、ユーザーの意見やアイデアを共有するためのプラットフォームです。</p>
+        <p>ユーザーは、法令および公序良俗に反する内容を投稿してはなりません。</p>
+        <p>運営は、不適切と判断した投稿を削除する場合があります。</p>
+        <p>本サービスは予告なく内容の変更、一時停止、終了を行うことがあります。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- プライバシーポリシーモーダル -->
+  <div id="privacy-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-6 relative">
+      <button onclick="closeModal('privacy-modal')"
+              class="absolute top-3 right-4 text-gray-400 hover:text-gray-600 text-2xl">×</button>
+      <h3 class="text-xl font-bold mb-4">プライバシーポリシー</h3>
+      <div class="max-h-80 overflow-y-auto text-sm text-gray-700 space-y-2">
+        <p>本サービスは、ユーザー登録やログインに必要な最小限の情報のみを取得します。</p>
+        <p>取得した情報は、認証、サービス改善、セキュリティ確保の目的のみに利用します。</p>
+        <p>本人の同意なく第三者に個人情報を提供することはありません（法令に基づく場合を除く）。</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+    }
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+  </script>
+</body>
+</html>`);
+});
+
+app.post('/signup/details', ensureAuthenticated, async (req, res) => {
+  const userId = req.user.id;
+  const { birthdate, gender, agree_tos, agree_privacy } = req.body;
+
+  if (!birthdate || !gender || !agree_tos || !agree_privacy) {
+    return res.send(
+      '<script>alert("生年月日・性別・利用規約・プライバシーポリシーの同意は必須です。"); history.back();</script>'
+    );
+  }
+
+  const { error } = await supabase
+    .from('users')
+    .update({
+      birthdate,
+      gender,
+      profile_completed: true
+    })
+    .eq('id', userId);
+
+  if (error) {
+    console.error('signup details update error:', error);
+    return res.send(
+      '<script>alert("プロフィール更新中にエラーが発生しました。"); history.back();</script>'
+    );
+  }
+
+  // 更新後のユーザーでセッション更新
+  const { data: updatedUser } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  req.login(updatedUser, () => {
+    res.redirect('/');
+  });
 });
 
 // =============================
