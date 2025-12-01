@@ -191,7 +191,17 @@ function ensureAuthenticated(req, res, next) {
   if (req.user) return next();
   return res.redirect('/login-modal');
 }
-
+// プロフィール未完了専用
+function ensureProfileIncomplete(req, res, next) {
+  if (!req.user) {
+    return res.redirect('/login-modal');
+  }
+  // すでに完了していたらホームへ
+  if (req.user.profile_completed) {
+    return res.redirect('/');
+  }
+  next();
+}
 // 共通ヘッダー（ロゴ中央 / 左にプロフィール＋設定 / 右にログインorログアウト）
 function renderHeader(user, opts = {}) {
   const lang = user?.lang || 'ja-JP';
@@ -375,7 +385,7 @@ app.get('/login-modal', (req, res) => {
 });
 
 // =============================
-// サインアップ画面
+// サインアップ画面（ステップ1：アカウント情報だけ）
 // =============================
 app.get('/signup', (req, res) => {
   const lang = getLang(req);
@@ -413,49 +423,15 @@ app.get('/signup', (req, res) => {
       <!-- ユーザーID (@〜) -->
       <input type="text" name="handle" placeholder="@ユーザーID（任意、20文字まで）"
              maxlength="20"
-             class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
+             class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-6 focus:outline-none focus:border-blue-500">
 
-      <!-- 生年月日 -->
-      <label class="block mb-2 text-sm text-gray-600">生年月日</label>
-      <input type="date" name="birthdate" required
-             class="w-full px-4 py-3 border border-gray-300 rounded-2xl mb-4 focus:outline-none focus:border-blue-500">
-
-      <!-- 性別 -->
-      <label class="block mb-2 text-sm text-gray-600">性別</label>
-      <div class="flex gap-4 mb-4 text-sm">
-        <label class="flex items-center gap-2">
-          <input type="radio" name="gender" value="male" required>
-          <span>男性</span>
-        </label>
-        <label class="flex items-center gap-2">
-          <input type="radio" name="gender" value="female">
-          <span>女性</span>
-        </label>
-        <label class="flex items-center gap-2">
-          <input type="radio" name="gender" value="other">
-          <span>その他</span>
-        </label>
-      </div>
-
-      <!-- 利用規約チェックボックス（※ここに「同意したものとみなします」を統合） -->
-      <div class="flex items-start gap-2 mb-6 text-xs text-gray-600">
-        <input type="checkbox" name="agree" value="1" required class="mt-1">
-        <span>
-          上の内容を送信することで、
-          <button type="button" onclick="openModal('tos-modal')" class="text-blue-500 underline">
-            利用規約
-          </button>
-          および
-          <button type="button" onclick="openModal('privacy-modal')" class="text-blue-500 underline">
-            プライバシーポリシー
-          </button>
-          に同意したことを確認します。
-        </span>
-      </div>
+      <p class="text-xs text-gray-500 mb-4">
+        次の画面で、生年月日・性別・利用規約への同意を入力します。
+      </p>
 
       <button type="submit"
               class="w-full bg-blue-500 text-white py-3 rounded-2xl font-semibold hover:bg-blue-600">
-        作成する
+        次へ
       </button>
     </form>
 
@@ -469,44 +445,6 @@ app.get('/signup', (req, res) => {
       すでにアカウントをお持ちですか？ Log in
     </p>
   </div>
-
-  <!-- 利用規約モーダル -->
-  <div id="tos-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-6 relative">
-      <button onclick="closeModal('tos-modal')"
-              class="absolute top-3 right-4 text-gray-400 hover:text-gray-600 text-2xl">×</button>
-      <h3 class="text-xl font-bold mb-4">利用規約</h3>
-      <div class="max-h-80 overflow-y-auto text-sm text-gray-700 space-y-2">
-        <p>本サービス「sententia」は、ユーザーの意見やアイデアを共有するためのプラットフォームです。</p>
-        <p>ユーザーは、法令および公序良俗に反する内容を投稿してはなりません。</p>
-        <p>運営は、不適切と判断した投稿を削除する場合があります。</p>
-        <p>本サービスは予告なく内容の変更、一時停止、終了を行うことがあります。</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- プライバシーポリシーモーダル -->
-  <div id="privacy-modal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-20">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 p-6 relative">
-      <button onclick="closeModal('privacy-modal')"
-              class="absolute top-3 right-4 text-gray-400 hover:text-gray-600 text-2xl">×</button>
-      <h3 class="text-xl font-bold mb-4">プライバシーポリシー</h3>
-      <div class="max-h-80 overflow-y-auto text-sm text-gray-700 space-y-2">
-        <p>本サービスは、ユーザー登録やログインに必要な最小限の情報のみを取得します。</p>
-        <p>取得した情報は、認証、サービス改善、セキュリティ確保の目的のみに利用します。</p>
-        <p>本人の同意なく第三者に個人情報を提供することはありません（法令に基づく場合を除く）。</p>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    function openModal(id) {
-      document.getElementById(id).classList.remove('hidden');
-    }
-    function closeModal(id) {
-      document.getElementById(id).classList.add('hidden');
-    }
-  </script>
 </body>
 </html>`);
 });
@@ -604,11 +542,11 @@ app.post('/login', async (req, res) => {
       !user.profile_completed || !user.birthdate || !user.gender;
 
     req.login(user, () => {
-      if (needsDetails) {
-        return res.redirect('/signup/details');
-      }
-      return res.redirect('/');
-    });
+  if (!user.profile_completed) {
+    return res.redirect('/signup/profile');
+  }
+  return res.redirect('/');
+});
   } catch (err) {
     console.error('Login error:', err);
     return res.send(
