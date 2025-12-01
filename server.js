@@ -538,15 +538,18 @@ app.post('/login', async (req, res) => {
       );
     }
 
+    // ここで「プロフィール未完了かどうか」を判定
     const needsDetails =
       !user.profile_completed || !user.birthdate || !user.gender;
 
     req.login(user, () => {
-  if (!user.profile_completed) {
-    return res.redirect('/signup/profile');
-  }
-  return res.redirect('/');
-});
+      if (needsDetails) {
+        // プロフィール詳細入力画面へ
+        return res.redirect('/signup/details');
+      }
+      // 完了していればホームへ
+      return res.redirect('/');
+    });
   } catch (err) {
     console.error('Login error:', err);
     return res.send(
