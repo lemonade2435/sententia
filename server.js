@@ -277,18 +277,20 @@ function renderHeader(user, opts = {}) {
   `;
   }
 
-  const rightHtml = user
-    ? `
+const rightHtml = user
+  ? `
   <div class="absolute right-4 top-3 flex items-center gap-3">
-    <form action="/logout" method="POST">
-      <button type="submit"
-              class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
-        ${t('logout', lang)}
-      </button>
-    </form>
+    <button onclick="location.href='/notifications'"
+            class="w-10 h-10 rounded-full border bg-white flex items-center justify-center hover:bg-gray-50">
+      <span class="sr-only">お知らせ</span>
+      <svg viewBox="0 0 24 24" class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+        <path d="M9 19a3 3 0 0 0 6 0" />
+      </svg>
+    </button>
   </div>
   `
-    : `
+  : `
   <div class="absolute right-4 top-3 flex items-center gap-3">
     <button onclick="location.href='/login-modal'"
             class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
@@ -912,6 +914,25 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
     </div>
   </div>
 
+    <!-- バージョン履歴 -->
+    <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
+      ...（今あるコードそのまま）...
+    </div>
+
+    <!-- ログアウト -->
+    <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
+      <h2 class="font-semibold text-lg mb-2">ログアウト</h2>
+      <p class="text-sm text-gray-600 mb-4">
+        sententia からログアウトします。再度利用するにはログインが必要です。
+      </p>
+      <form action="/logout" method="POST">
+        <button type="submit"
+                class="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-full font-semibold">
+          ログアウトする
+        </button>
+      </form>
+    </div>
+
   <script>
     (function () {
       const theme = '${theme}';
@@ -1362,6 +1383,145 @@ app.get('/profile/:id', async (req, res) => {
 
       applySystemTheme();
 
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      mq.addEventListener('change', applySystemTheme);
+    })();
+  </script>
+</body>
+</html>`);
+});
+
+// =============================
+// 通知一覧
+// =============================
+app.get('/notifications', ensureAuthenticated, async (req, res) => {
+  const user = req.user;
+  const theme = user.theme || 'system';
+  const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
+  const header = renderHeader(user, { showProfileIcon: true });
+
+  const locale = user.lang || 'ja-JP';
+  const timeZone = user.time_zone || 'Asia/Tokyo';
+
+  function formatTime(dateStr) {
+    return new Date(dateStr).toLocaleString(locale, {
+      timeZone,
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  // 自分宛ての通知を新しい順に取得
+  const { data: notifs, error } = await supabase
+    .from('notifications')
+    .select('id, type, post_id, created_at, read, actor:actor_id(username, handle)')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error('notifications error:', error);
+  }
+
+  const list = notifs || [];
+
+  function renderNotif(n) {
+    const actorName = n.actor?.username || '誰か';
+    const actorHandle = n.actor?.handle || '';
+    const timeStr = formatTime(n.created_at);
+    let mainText = '';
+
+    if (n.type === 'like') {
+      mainText = `${actorName} さんがあなたの投稿にいいねしました`;
+    } else if (n.type === 'follow') {
+      mainText = `${actorName} さんにフォローされました`;
+    } else if (n.type === 'reply') {
+      mainText = `${actorName} さんがあなたの投稿に返信しました`;
+    } else {
+      mainText = 'アクションがありました';
+    }
+
+    const link = n.post_id ? `/post/${n.post_id}` : '/';
+
+    return `
+      <a href="${link}"
+         class="block rounded-2xl px-4 py-3 mb-2 ${
+           n.read ? 'bg-white' : 'bg-blue-50'
+         } hover:bg-blue-100 transition">
+        <div class="text-sm font-semibold">${mainText}</div>
+        <div class="text-xs text-gray-500 mt-1">
+          ${actorHandle} ・ ${timeStr}
+        </div>
+      </a>
+    `;
+  }
+
+  const listHtml =
+    list.length === 0
+      ? '<p class="text-sm text-gray-500">まだお知らせはありません。</p>'
+      : list.map((n) => renderNotif(n)).join('');
+
+  // ここで既読にする（失敗しても無視）
+  if (list.length > 0) {
+    supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', user.id)
+      .eq('read', false);
+  }
+
+  res.send(`<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>お知らせ - sententia</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+  .dark-mode {
+    background-color: #0d1117;
+    color: #e5e7eb;
+  }
+  .dark-mode .post-card,
+  .dark-mode .bg-white {
+    background-color: #1a1f28;
+    color: #f3f4f6;
+  }
+  .dark-mode .text-gray-500 {
+    color: #9ca3af;
+  }
+  .dark-mode .border-gray-300 {
+    border-color: #4b5563;
+  }
+  </style>
+</head>
+<body class="${themeClass} min-h-screen">
+  ${header}
+  <div class="max-w-2xl mx-auto pt-32 pb-16 px-4">
+    <h1 class="text-2xl font-bold mb-4">お知らせ</h1>
+    <div>
+      ${listHtml}
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const theme = '${theme}';
+      if (theme !== 'system') return;
+      const body = document.body;
+      function applySystemTheme() {
+        const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (dark) {
+          body.classList.add('dark-mode');
+          body.classList.remove('bg-gray-100');
+        } else {
+          body.classList.remove('dark-mode');
+          body.classList.add('bg-gray-100');
+        }
+      }
+      applySystemTheme();
       const mq = window.matchMedia('(prefers-color-scheme: dark)');
       mq.addEventListener('change', applySystemTheme);
     })();
@@ -2049,7 +2209,11 @@ app.post('/post', ensureAuthenticated, async (req, res) => {
     insertObj.parent_post_id = parent_post_id;
   }
 
-  const { error } = await supabase.from('posts').insert(insertObj);
+  const { data: inserted, error } = await supabase
+    .from('posts')
+    .insert(insertObj)
+    .select()
+    .single();
 
   if (error) {
     return res.send(
@@ -2057,6 +2221,28 @@ app.post('/post', ensureAuthenticated, async (req, res) => {
         error.message +
         '"); history.back();</script>'
     );
+  }
+
+  // ★ 親投稿への返信なら通知
+  if (parent_post_id) {
+    try {
+      const { data: parentPost } = await supabase
+        .from('posts')
+        .select('user_id')
+        .eq('id', parent_post_id)
+        .single();
+
+      if (parentPost && parentPost.user_id !== req.user.id) {
+        await supabase.from('notifications').insert({
+          user_id: parentPost.user_id,
+          actor_id: req.user.id,
+          type: 'reply',
+          post_id: inserted.id
+        });
+      }
+    } catch (e) {
+      console.error('create reply notification error', e);
+    }
   }
 
   res.send('<script>alert("投稿完了！"); location.href = "/";</script>');
@@ -2084,6 +2270,7 @@ app.post('/like/:postId', ensureAuthenticated, async (req, res) => {
     const like = existing && existing.length > 0 ? existing[0] : null;
 
     if (like) {
+      // すでにいいね → 解除
       const { error: deleteError } = await supabase
         .from('likes')
         .delete()
@@ -2094,6 +2281,7 @@ app.post('/like/:postId', ensureAuthenticated, async (req, res) => {
         return res.status(500).send('error');
       }
     } else {
+      // まだ → いいね
       const { error: insertError } = await supabase.from('likes').insert({
         user_id: userId,
         post_id: postId
@@ -2102,6 +2290,26 @@ app.post('/like/:postId', ensureAuthenticated, async (req, res) => {
       if (insertError) {
         console.error('like insert error', insertError);
         return res.status(500).send('error');
+      }
+
+      // ★ 通知を作成
+      try {
+        const { data: post } = await supabase
+          .from('posts')
+          .select('user_id')
+          .eq('id', postId)
+          .single();
+
+        if (post && post.user_id !== userId) {
+          await supabase.from('notifications').insert({
+            user_id: post.user_id,
+            actor_id: userId,
+            type: 'like',
+            post_id: postId
+          });
+        }
+      } catch (e) {
+        console.error('create like notification error', e);
       }
     }
 
@@ -2166,6 +2374,18 @@ app.post('/follow/:targetId', ensureAuthenticated, async (req, res) => {
         return res.send(
           '<script>alert("フォローに失敗しました。"); history.back();</script>'
         );
+      }
+
+      // ★ 通知作成（フォローされた側）
+      try {
+        await supabase.from('notifications').insert({
+          user_id: targetId,
+          actor_id: followerId,
+          type: 'follow',
+          post_id: null
+        });
+      } catch (e) {
+        console.error('create follow notification error', e);
       }
     }
 
