@@ -742,16 +742,6 @@ app.get('/settings', ensureAuthenticated, async (req, res) => {
   const lang = getLang(req);
   const locale = user.lang || 'ja-JP';
   const unreadCount = await getUnreadCount(user.id);
-  let unreadCount = 0;
-  if (user) {
-    const { count } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('read', false);
-
-    unreadCount = count || 0;
-  }
 
   const theme = user.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
@@ -1074,18 +1064,8 @@ app.get('/me', ensureAuthenticated, (req, res) => {
 app.get('/profile/:id', async (req, res) => {
   const lang = getLang(req);
   const profileUserId = req.params.id;
-  const viewer = req.user; || null;
+  const viewer = req.user || null;
   const unreadCount = viewer ? await getUnreadCount(viewer.id) : 0;
-  let unreadCount = 0;
-  if (viewer) {
-    const { count } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', viewer.id)
-      .eq('read', false);
-
-    unreadCount = count || 0;
-  }
 
   const theme = viewer?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
@@ -1587,18 +1567,7 @@ app.get('/post/:id', async (req, res) => {
   const postId = req.params.id;
   const viewer = req.user || null;
   const unreadCount = viewer ? await getUnreadCount(viewer.id) : 0;
-  let unreadCount = 0;
-  if (viewer) {
-    const { count } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', viewer.id)
-      .eq('read', false);
-
-    unreadCount = count || 0;
-  }
-
-
+  
   const theme = viewer?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
   const header = renderHeader(viewer, {
@@ -1939,17 +1908,7 @@ app.get('/', async (req, res) => {
     });
   }
   const unreadCount = user ? await getUnreadCount(user.id) : 0;
-  let unreadCount = 0;
-  if (user) {
-    const { count } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .eq('read', false) 
-
-    unreadCount = count || 0;
-  }
-
+  
   const search = (req.query.q || '').trim();
   const replyTo = req.query.replyTo || '';
   const theme = user?.theme || 'system';
