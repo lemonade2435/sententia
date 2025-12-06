@@ -202,6 +202,22 @@ function ensureProfileIncomplete(req, res, next) {
   }
   next();
 }
+//未読
+async function getUnreadCount(userId) {
+  if (!userId) return 0;
+
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('read', false);
+
+  if (error) {
+    console.error('getUnreadCount error:', error);
+    return 0;
+  }
+  return count || 0;
+}
 // 共通ヘッダー（ロゴ中央 / 左にプロフィール＋設定 / 右にログインorログアウト）
 function renderHeader(user, opts = {}) {
   const lang = user?.lang || 'ja-JP';
@@ -307,7 +323,7 @@ function renderHeader(user, opts = {}) {
 
   return `
 <div class="fixed top-0 left-0 right-0 z-40 pt-0 flex justify-center">
-  <button onclick="location.href='/'" class="flex items-center -mt-4">
+  <button onclick="location.href='/'" class="flex items-center -mt-6">
     <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
   </button>
 
@@ -725,6 +741,7 @@ app.get('/settings', ensureAuthenticated, async (req, res) => {
   const user = req.user;
   const lang = getLang(req);
   const locale = user.lang || 'ja-JP';
+  const unreadCount = await getUnreadCount(user.id);
   let unreadCount = 0;
   if (user) {
     const { count } = await supabase
@@ -1057,7 +1074,8 @@ app.get('/me', ensureAuthenticated, (req, res) => {
 app.get('/profile/:id', async (req, res) => {
   const lang = getLang(req);
   const profileUserId = req.params.id;
-  const viewer = req.user;
+  const viewer = req.user; || null;
+  const unreadCount = viewer ? await getUnreadCount(viewer.id) : 0;
   let unreadCount = 0;
   if (viewer) {
     const { count } = await supabase
@@ -1423,7 +1441,9 @@ app.get('/notifications', ensureAuthenticated, async (req, res) => {
   const user = req.user;
   const theme = user.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
-  const header = renderHeader(user, { showProfileIcon: true });
+
+  // 通知ページを開いた時点で既読にするので、ヘッダーのバッジは 0 固定にする
+  const header = renderHeader(user, { showProfileIcon: true, unreadCount: 0 });
 
   const locale = user.lang || 'ja-JP';
   const timeZone = user.time_zone || 'Asia/Tokyo';
@@ -1488,15 +1508,20 @@ app.get('/notifications', ensureAuthenticated, async (req, res) => {
       ? '<p class="text-sm text-gray-500">まだお知らせはありません。</p>'
       : list.map((n) => renderNotif(n)).join('');
 
-  // ここで既読にする（失敗しても無視）
-  if (list.length > 0) {
-    supabase
+  // ★ ここで未読のものを既読に更新（しっかり await する）
+  const unreadIds = list.filter((n) => !n.read).map((n) => n.id);
+  if (unreadIds.length > 0) {
+    const { error: updateError } = await supabase
       .from('notifications')
       .update({ read: true })
-      .eq('user_id', user.id)
-      .eq('read', false);
+      .in('id', unreadIds);
+
+    if (updateError) {
+      console.error('notifications read update error:', updateError);
+    }
   }
 
+  // HTML は今のままで OK（header だけ上の header 変数に置き換える）
   res.send(`<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -1561,6 +1586,7 @@ app.get('/notifications', ensureAuthenticated, async (req, res) => {
 app.get('/post/:id', async (req, res) => {
   const postId = req.params.id;
   const viewer = req.user || null;
+  const unreadCount = viewer ? await getUnreadCount(viewer.id) : 0;
   let unreadCount = 0;
   if (viewer) {
     const { count } = await supabase
@@ -1912,6 +1938,7 @@ app.get('/', async (req, res) => {
       ...opts
     });
   }
+  const unreadCount = user ? await getUnreadCount(user.id) : 0;
   let unreadCount = 0;
   if (user) {
     const { count } = await supabase
