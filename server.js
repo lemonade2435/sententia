@@ -721,7 +721,7 @@ app.post('/signup/details', ensureAuthenticated, async (req, res) => {
 // =============================
 // 設定画面
 // =============================
-app.get('/settings', ensureAuthenticated, (req, res) => {
+app.get('/settings', ensureAuthenticated, async (req, res) => {
   const user = req.user;
   const lang = getLang(req);
   const locale = user.lang || 'ja-JP';
@@ -1059,11 +1059,11 @@ app.get('/profile/:id', async (req, res) => {
   const profileUserId = req.params.id;
   const viewer = req.user;
   let unreadCount = 0;
-  if (user) {
+  if (viewer) {
     const { count } = await supabase
       .from('notifications')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .eq('user_id', viewer.id)
       .eq('read', false);
 
     unreadCount = count || 0;
@@ -1074,7 +1074,10 @@ app.get('/profile/:id', async (req, res) => {
   const locale = viewer?.lang || 'ja-JP';
   const timeZone = viewer?.time_zone || 'Asia/Tokyo';
 
-  const header = renderHeader(user, { showProfileIcon: true, unreadCount });
+  const header = renderHeader(viewer, {
+    showProfileIcon: false,
+    unreadCount
+  });
   function formatTime(dateStr, opts = {}) {
     return new Date(dateStr).toLocaleString(locale, {
       timeZone,
@@ -1241,8 +1244,6 @@ app.get('/profile/:id', async (req, res) => {
       </div>
     `;
   }
-
-  const header = renderHeader(viewer, { showProfileIcon: false });
 
   const postsHtml =
     userPosts.length === 0
@@ -1561,11 +1562,11 @@ app.get('/post/:id', async (req, res) => {
   const postId = req.params.id;
   const viewer = req.user || null;
   let unreadCount = 0;
-  if (user) {
+  if (viewer) {
     const { count } = await supabase
       .from('notifications')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', user.id)
+      .eq('user_id', viewer.id)
       .eq('read', false);
 
     unreadCount = count || 0;
@@ -1574,7 +1575,10 @@ app.get('/post/:id', async (req, res) => {
 
   const theme = viewer?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
-  const header = renderHeader(viewer, { showProfileIcon: true,unreadCount });
+  const header = renderHeader(viewer, {
+    showProfileIcon: true,
+    unreadCount
+  });
 
   const locale = viewer?.lang || 'ja-JP';
   const timeZone = viewer?.time_zone || 'Asia/Tokyo';
