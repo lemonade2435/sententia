@@ -206,7 +206,7 @@ function ensureProfileIncomplete(req, res, next) {
 function renderHeader(user, opts = {}) {
   const lang = user?.lang || 'ja-JP';
   const showProfileIcon = opts.showProfileIcon !== false;
-
+  const unreadCount = opts.unreadCount || 0;
   let leftHtml = '';
   if (user) {
     const profileButton = showProfileIcon
@@ -277,20 +277,26 @@ function renderHeader(user, opts = {}) {
   `;
   }
 
-const rightHtml = user
-  ? `
+  const rightHtml = user
+    ? `
   <div class="absolute right-4 top-3 flex items-center gap-3">
     <button onclick="location.href='/notifications'"
-            class="w-10 h-10 rounded-full border bg-white flex items-center justify-center hover:bg-gray-50">
-      <span class="sr-only">お知らせ</span>
-      <svg viewBox="0 0 24 24" class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
-        <path d="M9 19a3 3 0 0 0 6 0" />
+            class="relative w-10 h-10 rounded-full border bg-white flex items-center justify-center hover:bg-gray-50">
+      <!-- 🔔 アイコン本体 -->
+      <svg viewBox="0 0 24 24" class="w-6 h-6 text-gray-700" fill="currentColor">
+        <path d="M12 2a4 4 0 0 0-4 4v1.1C6.3 8 5 9.6 5 11.5V16l-1.5 1.5A1 1 0 0 0 4 19h16a1 1 0 0 0 .7-1.7L19 16v-4.5C19 9.6 17.7 8 16 7.1V6a4 4 0 0 0-4-4zM10 20a2 2 0 1 0 4 0h-4z"/>
       </svg>
+
+      ${
+        // ★ 未読があれば青丸バッジ表示
+        unreadCount > 0
+          ? `<span class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-blue-500 border-2 border-white"></span>`
+          : ''
+      }
     </button>
   </div>
   `
-  : `
+    : `
   <div class="absolute right-4 top-3 flex items-center gap-3">
     <button onclick="location.href='/login-modal'"
             class="bg-black text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800">
@@ -301,7 +307,7 @@ const rightHtml = user
 
   return `
 <div class="fixed top-0 left-0 right-0 z-40 pt-0 flex justify-center">
-  <button onclick="location.href='/'" class="flex items-center -mt-3">
+  <button onclick="location.href='/'" class="flex items-center -mt-4">
     <img src="/logo.png" alt="sententia" class="h-28 w-[800px] object-contain">
   </button>
 
@@ -719,10 +725,21 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
   const user = req.user;
   const lang = getLang(req);
   const locale = user.lang || 'ja-JP';
+  let unreadCount = 0;
+  if (user) {
+    const { count } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('read', false);
+
+    unreadCount = count || 0;
+  }
+
   const theme = user.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
 
-  const header = renderHeader(user, { showProfileIcon: true });
+  const header = renderHeader(user, { showProfileIcon: true,unreadCount });
 
   res.send(`<!DOCTYPE html>
 <html lang="ja">
@@ -913,12 +930,7 @@ app.get('/settings', ensureAuthenticated, (req, res) => {
       </div>
     </div>
   </div>
-
-    <!-- バージョン履歴 -->
-    <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
-      ...（今あるコードそのまま）...
-    </div>
-
+  
     <!-- ログアウト -->
     <div class="bg-white rounded-2xl shadow-md p-6 mb-4">
       <h2 class="font-semibold text-lg mb-2">ログアウト</h2>
@@ -1046,11 +1058,23 @@ app.get('/profile/:id', async (req, res) => {
   const lang = getLang(req);
   const profileUserId = req.params.id;
   const viewer = req.user;
+  let unreadCount = 0;
+  if (user) {
+    const { count } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('read', false);
+
+    unreadCount = count || 0;
+  }
+
   const theme = viewer?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
   const locale = viewer?.lang || 'ja-JP';
   const timeZone = viewer?.time_zone || 'Asia/Tokyo';
 
+  const header = renderHeader(user, { showProfileIcon: true, unreadCount });
   function formatTime(dateStr, opts = {}) {
     return new Date(dateStr).toLocaleString(locale, {
       timeZone,
@@ -1536,11 +1560,21 @@ app.get('/notifications', ensureAuthenticated, async (req, res) => {
 app.get('/post/:id', async (req, res) => {
   const postId = req.params.id;
   const viewer = req.user || null;
+  let unreadCount = 0;
+  if (user) {
+    const { count } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('read', false);
 
-  // テーマと言語／タイムゾーン
+    unreadCount = count || 0;
+  }
+
+
   const theme = viewer?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
-  const header = renderHeader(viewer, { showProfileIcon: true });
+  const header = renderHeader(viewer, { showProfileIcon: true,unreadCount });
 
   const locale = viewer?.lang || 'ja-JP';
   const timeZone = viewer?.time_zone || 'Asia/Tokyo';
@@ -1874,12 +1908,22 @@ app.get('/', async (req, res) => {
       ...opts
     });
   }
+  let unreadCount = 0;
+  if (user) {
+    const { count } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('read', false) 
+
+    unreadCount = count || 0;
+  }
 
   const search = (req.query.q || '').trim();
   const replyTo = req.query.replyTo || '';
   const theme = user?.theme || 'system';
   const themeClass = theme === 'dark' ? 'dark-mode' : 'bg-gray-100';
-  const header = renderHeader(user, { showProfileIcon: true });
+  const header = renderHeader(user, { showProfileIcon: true, unreadCount });
 
   let postsQuery = supabase
     .from('posts')
